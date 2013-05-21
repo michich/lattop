@@ -1,11 +1,16 @@
 %{
 #include <linux/stacktrace.h>
 #include <linux/latencytop.h>
+
+#ifndef LT_BACKTRACEDEPTH
+#define LT_BACKTRACEDEPTH	12
+#endif
+
 %}
 
 function task_stack_trace:string(tsk:long) %{
-        struct stack_trace trace;
-	struct latency_record lat;
+	struct stack_trace trace;
+	unsigned long backtrace[LT_BACKTRACEDEPTH];
 	char *p = STAP_RETVALUE;
 	int i;
 	bool first = true;
@@ -14,11 +19,11 @@ function task_stack_trace:string(tsk:long) %{
 
         memset(&trace, 0, sizeof(trace));
         trace.max_entries = LT_BACKTRACEDEPTH;
-        trace.entries = &lat.backtrace[0];
+        trace.entries = backtrace;
         save_stack_trace_tsk((struct task_struct*)STAP_ARG_tsk, &trace);
 
 	for (i = 0; i < LT_BACKTRACEDEPTH; i++) {
-		unsigned long record = lat.backtrace[i];
+		unsigned long record = backtrace[i];
 		if (record == 0 || record == ULONG_MAX)
 			goto finish;
 
