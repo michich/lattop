@@ -9,6 +9,36 @@
 #include "process.h"
 #include "timespan.h"
 
+static void la_clear(struct latency_account *la)
+{
+	la->total = la->max = la->count = 0;
+}
+
+static void la_init(struct latency_account *la, uint64_t delay)
+{
+	la->total = delay;
+	la->max   = delay;
+	la->count = 1;
+}
+
+static void la_add_delay(struct latency_account *la, uint64_t delay)
+{
+	la->total += delay;
+	if (la->max < delay)
+		la->max = delay;
+	la->count++;
+}
+
+static void la_sum_delay(struct latency_account *la,
+                                const struct latency_account *other)
+{
+	la->total += other->total;
+	if (la->max < other->max)
+		la->max = other->max;
+	la->count += other->count;
+}
+
+
 void process_dump(struct process *p)
 {
 	struct rb_node *node;
