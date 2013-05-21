@@ -1,0 +1,75 @@
+%{
+#include <linux/stacktrace.h>
+#include <linux/latencytop.h>
+%}
+
+function task_stack_trace:string(tsk:long) %{
+        struct stack_trace trace;
+	struct latency_record lat;
+	char *p = STAP_RETVALUE;
+	int i;
+	bool first = true;
+
+	BUILD_BUG_ON(MAXSTRINGLEN < LT_BACKTRACEDEPTH * (2 + 8*2 + 1));
+
+        memset(&trace, 0, sizeof(trace));
+        trace.max_entries = LT_BACKTRACEDEPTH;
+        trace.entries = &lat.backtrace[0];
+        save_stack_trace_tsk((struct task_struct*)STAP_ARG_tsk, &trace);
+
+	for (i = 0; i < LT_BACKTRACEDEPTH; i++) {
+		unsigned long record = lat.backtrace[i];
+		if (record == 0 || record == ULONG_MAX)
+			goto finish;
+
+		if (!first)
+			*p++ = ' ';
+
+		sprintf(p, "0x%08lx", record);
+		p += 2 + 8*2;
+		first = false;
+	}
+finish:
+	*p = '\0';
+%}
+
+probe kernel.trace("sched_stat_sleep") {
+	/* Long interruptible waits are generally user-requested */
+	/* Negative sleeps are time going backwards */
+	/* Zero-time sleeps are non-interesting */
+	if ($delay > 0 && $delay <= 5000000) {
+		printf("S %lu %lu(%s) %s\n",
+		       $delay, task_tid($tsk), task_execname($tsk),
+		       task_stack_trace($tsk));
+	}
+}
+
+probe kernel.trace("sched_stat_blocked") {
+	/* Negative sleeps are time going backwards */
+	/* Zero-time sleeps are non-interesting */
+	if ($delay > 0) {
+		printf("B %lu %lu(%s) %s\n",
+		       $delay, task_tid($tsk), task_execname($tsk),
+		       task_stack_trace($tsk));
+	}
+}
+
+
+#/* Reads the char value stored at a given address: */ 
+#function __read_char:long(addr:long) %{ /* pure */
+#         STAP_RETVALUE = kderef(sizeof(char), STAP_ARG_addr);
+#         CATCH_DEREF_FAULT ();
+#%} /* <-- function body */
+
+#/* Determines whether an IP packet is TCP, based on the iphdr: */
+#function is_tcp_packet:long(iphdr) {
+#         protocol = @cast(iphdr, "iphdr")->protocol
+#         return (protocol == %{ IPPROTO_TCP %}) /* <-- expression */
+#}
+
+/*probe begin {
+	b = backtrace();
+	printf("%s\n", b);
+	printf("%s\n", print_stack(b));
+	print_backtrace();
+}*/
