@@ -1,0 +1,9 @@
+Requires:
+	To build:
+		g++
+	To run:
+		a kernel with the sched_latencytop tracepoint added
+Build with:
+	make
+Test with:
+	./test.sh   (under root)
