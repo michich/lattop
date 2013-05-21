@@ -57,6 +57,7 @@ struct process {
 	struct rb_node rb_node;		/* tree of processes, sorted by pid */
 	struct rb_root bt2la_map;	/* this process's latencies, sorted by the backtrace */
 	pid_t pid;
+	char comm[16];
 	struct latency_account summarized;
 };
 
@@ -116,7 +117,7 @@ static inline void process_suffer_latency(struct process *p, uint64_t delay,
 	rb_insert_color(&item->rb_node, &p->bt2la_map);
 }
 
-struct process *process_new(pid_t pid);
+struct process *process_new(pid_t pid, const char comm[16]);
 void process_summarize(struct process *p);
 void process_dump(struct process *p);
 void process_fini(struct process *p);

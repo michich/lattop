@@ -83,7 +83,7 @@ int app_init(void)
 
 	pa_init(&accountant);
 
-	readers[0] = perf_reader_new();
+	readers[0] = stap_reader_new();
 	readers[1] = command_reader_new();
 
 	for (i = 0; i < NUM_READERS; i++) {

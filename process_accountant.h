@@ -46,7 +46,8 @@ static inline struct process *__search_process(struct process_accountant *pa,
 }
 
 static inline void pa_account_latency(struct process_accountant *pa, pid_t pid,
-                                      uint64_t delay, struct back_trace *bt)
+                                      const char comm[16], uint64_t delay,
+                                      struct back_trace *bt)
 {
 	struct process *process;
 	struct rb_node *parent;
@@ -54,7 +55,7 @@ static inline void pa_account_latency(struct process_accountant *pa, pid_t pid,
 
 	process = __search_process(pa, pid, &parent, &link);
 	if (!process) {
-		process = process_new(pid);
+		process = process_new(pid, comm);
 		rb_link_node(&process->rb_node, parent, link);
 		rb_insert_color(&process->rb_node, &pa->processes);
 	}

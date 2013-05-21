@@ -9,6 +9,7 @@
 #include "process_accountant.h"
 #include "perf_reader.h"
 #include "command_reader.h"
+#include "stap_reader.h"
 
 int  app_init(void);
 void app_fini(void);

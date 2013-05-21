@@ -31,6 +31,7 @@ void pa_dump(struct process_accountant *pa)
 	for (node = rb_first(&pa->processes); node; node = rb_next(node)) {
 		process = rb_entry(node, struct process, rb_node);
 		printf("PID: %d\n", process->pid);
+		printf("comm: %s\n", process->comm);
 		process_summarize(process);
 		process_dump(process);
 		printf("\n");

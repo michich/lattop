@@ -38,8 +38,8 @@ probe kernel.trace("sched_stat_sleep") {
 	/* Negative sleeps are time going backwards */
 	/* Zero-time sleeps are non-interesting */
 	if ($delay > 0 && $delay <= 5000000) {
-		printf("S %lu %lu(%s) %s\n",
-		       $delay, task_tid($tsk), task_execname($tsk),
+		printf("S %lu %lu %lu %s\n%s\n",
+		       $delay, task_pid($tsk), task_tid($tsk), task_execname($tsk),
 		       task_stack_trace($tsk));
 	}
 }
@@ -48,8 +48,8 @@ probe kernel.trace("sched_stat_blocked") {
 	/* Negative sleeps are time going backwards */
 	/* Zero-time sleeps are non-interesting */
 	if ($delay > 0) {
-		printf("B %lu %lu(%s) %s\n",
-		       $delay, task_tid($tsk), task_execname($tsk),
+		printf("B %lu %lu %lu %s\n%s\n",
+		       $delay, task_pid($tsk), task_tid($tsk), task_execname($tsk),
 		       task_stack_trace($tsk));
 	}
 }
