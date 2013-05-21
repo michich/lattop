@@ -61,62 +61,8 @@ struct process {
 	struct latency_account summarized;
 };
 
-/*
- * Search the rb-tree
- * Returns the node with the same back_trace if it exists.
- * If not, returns NULL, and sets the 'parent' and 'link' pointers to where
- * the newly created node should be put.
- */
-static inline struct bt2la *__rb_search_bt2la(struct process *process,
-                                              struct back_trace *bt,
-                                              struct rb_node **pparent,
-					      struct rb_node ***plink)
-{
-	struct rb_node **p = &process->bt2la_map.rb_node;
-	struct rb_node *parent = NULL;
-	struct bt2la *bt2la;
-	int cmp;
-
-	while (*p) {
-		parent = *p;
-		bt2la = rb_entry(parent, struct bt2la, rb_node);
-
-		cmp = bt_compare(bt, &bt2la->bt);
-		if (cmp < 0)
-			p = &(*p)->rb_left;
-		else if (cmp > 0)
-			p = &(*p)->rb_right;
-		else
-			return bt2la;
-	}
-
-	*pparent = parent;
-	*plink = p;
-
-	return NULL;
-}
-
-static inline void process_suffer_latency(struct process *p, uint64_t delay,
-                                          struct back_trace *bt)
-{
-	struct bt2la *item;
-	struct rb_node *parent;
-	struct rb_node **link;
-
-	item = __rb_search_bt2la(p, bt, &parent, &link);
-	if (item) {
-		la_add_delay(&item->la, delay);
-		return;
-	}
-
-	item = malloc(sizeof(struct bt2la));
-	item->bt = *bt;
-	la_init(&item->la, delay);
-
-	rb_link_node(&item->rb_node, parent, link);
-	rb_insert_color(&item->rb_node, &p->bt2la_map);
-}
-
+void process_suffer_latency(struct process *p, uint64_t delay,
+                            struct back_trace *bt);
 struct process *process_new(pid_t pid, const char comm[16]);
 void process_summarize(struct process *p);
 void process_dump(struct process *p);
