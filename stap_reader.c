@@ -23,6 +23,7 @@ static int stap_reader_start(struct polled_reader *pr)
 {
 	struct stap_reader *r = (struct stap_reader*) pr;
 
+	/* TODO avoid popen, use manual pipe,fork,exec */
 	r->stap_popen = popen("stap -g lat.stp", "re");
 
 	return !r->stap_popen;
@@ -42,6 +43,9 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 	int nread;
 	char sleep_or_block;
 	bool end_of_trace;
+
+	/* TODO I don't think getline (buffered) mixes well with poll().
+         * Should use a non-blocking fd and read everything there is to read. */
 
 	/* 1st line - task info */
 	n = getline(&r->line, &r->len, r->stap_popen);
