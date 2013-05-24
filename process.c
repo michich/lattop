@@ -43,6 +43,9 @@ void process_dump(struct process *p)
 {
 	struct rb_node *node;
 	char buf[32];
+
+	printf("PID: %d  TID: %d  comm: %s\n", p->pid, p->tid, p->comm);
+
 	for (node = rb_first(&p->bt2la_map); node; node = rb_next(node)) {
 		struct bt2la *bt2la = rb_entry(node, struct bt2la, rb_node);
 		printf(" Trace: "); bt_dump(&bt2la->bt); printf("\n");

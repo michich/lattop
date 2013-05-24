@@ -40,7 +40,6 @@ void pa_dump_and_clear(void)
 	struct process *process;
 	for (node = rb_first(&accountant.processes); node; node = rb_next(node)) {
 		process = rb_entry(node, struct process, rb_node);
-		printf("PID: %d  TID: %d  comm: %s\n", process->pid, process->tid, process->comm);
 		process_summarize(process);
 		process_dump(process);
 		printf("\n");
