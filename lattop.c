@@ -3,6 +3,7 @@
  * Author: Michal Schmidt
  * License: GPLv2
  */
+#include <errno.h>
 #include <poll.h>
 #include <sched.h>
 #include <string.h>
@@ -26,7 +27,7 @@ static int main_loop(void)
 
 	memset(fds, 0, sizeof(fds));
 	for (i = 0; i < NUM_READERS; i++) {
-		fds[i].fd = readers[i]->get_fd(readers[i]);
+		fds[i].fd = readers[i]->ops->get_fd(readers[i]);
 		fds[i].events = POLLIN;
 	}
 
@@ -42,7 +43,7 @@ static int main_loop(void)
 	
 		for (i = 0; i < NUM_READERS; i++) {
 			if (fds[i].revents) {
-				err = readers[i]->handle_ready_fd(readers[i]);
+				err = readers[i]->ops->handle_ready_fd(readers[i]);
 				if (err) {
 					should_quit = 1;
 					break;
@@ -72,11 +73,11 @@ struct process_accountant *app_getPA(void)
 
 static int init(void)
 {
-	int err, i;
+	int r, i;
 	struct sched_param schedp;
 
-	err = sym_translator_init();
-	if (err) {
+	r = sym_translator_init();
+	if (r) {
 		fprintf(stderr, "Failed to init the symbol map.\n");
 		return 1;
 	}
@@ -87,8 +88,8 @@ static int init(void)
 	readers[1] = command_reader_new();
 
 	for (i = 0; i < NUM_READERS; i++) {
-		err = readers[i]->start(readers[i]);
-		if (err) {
+		r = readers[i]->ops->start(readers[i]);
+		if (r) {
 			fprintf(stderr, "Failed to start a reader.\n");
 			return 1;
 		}
@@ -96,7 +97,9 @@ static int init(void)
 
 	memset(&schedp, 0, sizeof(schedp));
 	schedp.sched_priority = 10;
-	sched_setscheduler(0, SCHED_FIFO, &schedp);
+	r = sched_setscheduler(0, SCHED_FIFO, &schedp);
+	if (r < 0)
+		fprintf(stderr, "Warning: Failed to set real-time scheduling policy: %s\n", strerror(errno));
 
 	return 0;
 }
@@ -105,8 +108,8 @@ static void fini(void)
 {
 	int i;
 	for (i = 0; i < NUM_READERS; i++) {
-		if (readers[i]->fini)
-			readers[i]->fini(readers[i]);
+		if (readers[i]->ops->fini)
+			readers[i]->ops->fini(readers[i]);
 		free(readers[i]);
 	}
 	pa_fini(&accountant);

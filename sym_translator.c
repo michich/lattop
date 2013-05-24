@@ -4,6 +4,7 @@
  * License: GPLv2
  */
 #include <sys/types.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,9 +67,11 @@ static int parse_kallsyms(void)
 	char *name;
 	struct symbol *s;
 
-	f = fopen("/proc/kallsyms", "r");
-	if (!f)
-		return 1;
+	f = fopen("/proc/kallsyms", "re");
+	if (!f) {
+		perror("/proc/kallsyms");
+		return -errno;
+	}
 
 	while ((read = getline(&line, &len, f)) != -1) {
 		sscanf(line, "%lx %c %ms", &addr, &type, &name);

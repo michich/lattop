@@ -91,13 +91,12 @@ static int stap_reader_get_fd(struct polled_reader *pr)
 	return fileno(r->stap_popen);
 }
 
-static void stap_reader_init(struct stap_reader *r)
-{
-	r->pr.fini = stap_reader_fini;
-	r->pr.start = stap_reader_start;
-	r->pr.get_fd = stap_reader_get_fd;
-	r->pr.handle_ready_fd = stap_reader_handle_ready_fd;
-}
+static const struct polled_reader_ops stap_reader_ops = {
+	.fini = stap_reader_fini,
+	.start = stap_reader_start,
+	.get_fd = stap_reader_get_fd,
+	.handle_ready_fd = stap_reader_handle_ready_fd,
+};
 
 struct polled_reader *stap_reader_new(void)
 {
@@ -107,6 +106,7 @@ struct polled_reader *stap_reader_new(void)
 	if (r == NULL)
 		return NULL;
 
-	stap_reader_init(r);
+	r->pr.ops = &stap_reader_ops;
+
 	return &r->pr;
 }

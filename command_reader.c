@@ -53,6 +53,12 @@ static int cr_handle_ready_fd(struct polled_reader *pr)
 	return 0;
 }
 
+static const struct polled_reader_ops command_reader_ops = {
+	.start = cr_start,
+	.get_fd = cr_get_fd,
+	.handle_ready_fd = cr_handle_ready_fd,
+};
+
 struct polled_reader *command_reader_new(void)
 {
 	struct command_reader *cr;
@@ -60,11 +66,8 @@ struct polled_reader *command_reader_new(void)
 	cr = calloc(1, sizeof(struct command_reader));
 	if (cr == NULL)
 		return NULL;
-	
-	/* cr->pr.fini = cr_fini; */
-	cr->pr.start = cr_start;
-	cr->pr.get_fd = cr_get_fd;
-	cr->pr.handle_ready_fd = cr_handle_ready_fd;
+
+	cr->pr.ops = &command_reader_ops;
 
 	return &cr->pr;
 }

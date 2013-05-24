@@ -343,14 +343,18 @@ static int perf_reader_get_fd(struct polled_reader *pr)
 	return r->fds[0];
 }
 
+static const struct polled_reader_ops perf_reader_ops = {
+	.fini = perf_reader_fini,
+	.start = perf_reader_start,
+	.get_fd = perf_reader_get_fd,
+	.handle_ready_fd = perf_reader_handle_ready_fd,
+};
+
 static void perf_reader_init(struct perf_reader *r)
 {
 	int i;
 
-	r->pr.fini = perf_reader_fini;
-	r->pr.start = perf_reader_start;
-	r->pr.get_fd = perf_reader_get_fd;
-	r->pr.handle_ready_fd = perf_reader_handle_ready_fd;
+	r->pr.ops = &perf_reader_ops;
 
 	r->nr_cpus = read_cpu_map();
 	for (i = 0; i < r->nr_cpus; i++)
