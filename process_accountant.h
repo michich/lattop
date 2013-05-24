@@ -6,21 +6,17 @@
 #ifndef _PROCESS_ACCOUNTANT_H
 #define _PROCESS_ACCOUNTANT_H
 
-#include "process.h"
+#include <sys/types.h>
+#include <stdint.h>
 
-struct process_accountant {
-	struct rb_root processes;
-};
+#include "back_trace.h"
 
-extern struct process_accountant accountant;
-
-void pa_init(struct process_accountant *pa);
-void pa_fini(struct process_accountant *pa);
-void pa_summarize(struct process_accountant *pa);
-void pa_dump(struct process_accountant *pa);
-void pa_clear_all(struct process_accountant *pa);
-void pa_account_latency(struct process_accountant *pa, pid_t pid,
-                        const char comm[16], uint64_t delay,
+void pa_init(void);
+void pa_fini(void);
+void pa_summarize(void);
+void pa_dump(void);
+void pa_clear_all(void);
+void pa_account_latency(pid_t pid, const char comm[16], uint64_t delay,
                         struct back_trace *bt);
 
 #endif

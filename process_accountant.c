@@ -4,7 +4,15 @@
  * License: GPLv2
  */
 #include <stdio.h>
+
 #include "process_accountant.h"
+
+#include "process.h"
+#include "rbtree.h"
+
+struct process_accountant {
+	struct rb_root processes;
+};
 
 struct process_accountant accountant;
 
@@ -20,17 +28,17 @@ static void pa_delete_rbtree(struct rb_node *n)
 	free(p);
 }
 
-void pa_clear_all(struct process_accountant *pa)
+void pa_clear_all(void)
 {
-	pa_delete_rbtree(pa->processes.rb_node);
-	pa->processes = RB_ROOT;
+	pa_delete_rbtree(accountant.processes.rb_node);
+	accountant.processes = RB_ROOT;
 }
 
-void pa_dump(struct process_accountant *pa)
+void pa_dump(void)
 {
 	struct rb_node *node;
 	struct process *process;
-	for (node = rb_first(&pa->processes); node; node = rb_next(node)) {
+	for (node = rb_first(&accountant.processes); node; node = rb_next(node)) {
 		process = rb_entry(node, struct process, rb_node);
 		printf("PID: %d\n", process->pid);
 		printf("comm: %s\n", process->comm);
@@ -41,12 +49,10 @@ void pa_dump(struct process_accountant *pa)
 	printf("-\n");
 }
 
-static struct process *__search_process(struct process_accountant *pa,
-                                               pid_t pid,
-                                               struct rb_node **pparent,
-					       struct rb_node ***plink)
+static struct process *__search_process(pid_t pid, struct rb_node **pparent,
+					struct rb_node ***plink)
 {
-	struct rb_node **p = &pa->processes.rb_node;
+	struct rb_node **p = &accountant.processes.rb_node;
 	struct rb_node *parent = NULL;
 	struct process *process;
 
@@ -68,30 +74,29 @@ static struct process *__search_process(struct process_accountant *pa,
 	return NULL;
 }
 
-void pa_account_latency(struct process_accountant *pa, pid_t pid,
-                        const char comm[16], uint64_t delay,
+void pa_account_latency(pid_t pid, const char comm[16], uint64_t delay,
                         struct back_trace *bt)
 {
 	struct process *process;
 	struct rb_node *parent;
 	struct rb_node **link;
 
-	process = __search_process(pa, pid, &parent, &link);
+	process = __search_process(pid, &parent, &link);
 	if (!process) {
 		process = process_new(pid, comm);
 		rb_link_node(&process->rb_node, parent, link);
-		rb_insert_color(&process->rb_node, &pa->processes);
+		rb_insert_color(&process->rb_node, &accountant.processes);
 	}
 	process_suffer_latency(process, delay, bt);
 }
 
 
-void pa_init(struct process_accountant *pa)
+void pa_init(void)
 {
-	pa->processes = RB_ROOT;
+	accountant.processes = RB_ROOT;
 }
 
-void pa_fini(struct process_accountant *pa)
+void pa_fini(void)
 {
-	pa_clear_all(pa);
+	pa_clear_all();
 }

@@ -264,7 +264,7 @@ static int parse_event(const struct sample_event *e)
 	struct back_trace bt;
 	bt_init(&bt, e->backtrace, LT_BACKTRACEDEPTH);
 
-	pa_account_latency(&accountant,
+	pa_account_latency(
 		e->tgid,  // userspace's pid is kernel's tgid
 		e->comm,
 		e->delay,

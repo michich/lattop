@@ -69,7 +69,7 @@ static void fini(void)
 			readers[i]->ops->fini(readers[i]);
 		free(readers[i]);
 	}
-	pa_fini(&accountant);
+	pa_fini();
 	sym_translator_fini();
 }
 
@@ -84,7 +84,7 @@ static int init(void)
 		goto err;
 	}
 
-	pa_init(&accountant);
+	pa_init();
 
 	i = 0;
 	readers[i++] = stap_reader_new();

@@ -33,8 +33,8 @@ static int cr_handle_ready_fd(struct polled_reader *pr)
 	}
 
 	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n"))) {
-		pa_dump(&accountant);
-		pa_clear_all(&accountant);
+		pa_dump();
+		pa_clear_all();
 	} else if (!memcmp(cr->buffer, "version\n", strlen("version\n")))
 		printf("0.4\n");
 	else if (!memcmp(cr->buffer, "help\n", strlen("help\n")))
