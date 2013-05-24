@@ -13,6 +13,7 @@
 
 #include "process_accountant.h"
 #include "sym_translator.h"
+#include "lat_translator.h"
 
 #include "polled_reader.h"
 #include "command_reader.h"
@@ -72,6 +73,7 @@ static void fini(void)
 		free(readers[i]);
 	}
 	pa_fini();
+	lat_translator_fini();
 	sym_translator_fini();
 }
 
@@ -85,6 +87,12 @@ static int init(void)
 		fprintf(stderr, "Failed to init the symbol map.\n");
 		goto err;
 	}
+
+	r = lat_translator_init();
+	if (r)
+		fprintf(stderr, "Warning: Failed to load latencytop translations.\n");
+
+	lat_translator_dump();
 
 	pa_init();
 
