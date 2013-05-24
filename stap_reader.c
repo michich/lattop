@@ -26,7 +26,7 @@ static int stap_reader_start(struct polled_reader *pr)
 	/* TODO avoid popen, use manual pipe,fork,exec */
 	r->stap_popen = popen("stap -g lat.stp", "re");
 
-	return !r->stap_popen;
+	return r->stap_popen ? 0 : -errno;
 }
 
 static int stap_reader_handle_ready_fd(struct polled_reader *pr)
