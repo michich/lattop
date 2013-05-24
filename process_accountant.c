@@ -28,13 +28,13 @@ static void pa_delete_rbtree(struct rb_node *n)
 	free(p);
 }
 
-void pa_clear_all(void)
+void pa_clear(void)
 {
 	pa_delete_rbtree(accountant.processes.rb_node);
 	accountant.processes = RB_ROOT;
 }
 
-void pa_dump(void)
+void pa_dump_and_clear(void)
 {
 	struct rb_node *node;
 	struct process *process;
@@ -47,6 +47,8 @@ void pa_dump(void)
 		printf("\n");
 	}
 	printf("-\n");
+
+	pa_clear();
 }
 
 static struct process *__search_process(pid_t pid, struct rb_node **pparent,
@@ -98,5 +100,5 @@ void pa_init(void)
 
 void pa_fini(void)
 {
-	pa_clear_all();
+	pa_clear();
 }

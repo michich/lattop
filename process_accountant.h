@@ -13,10 +13,9 @@
 
 void pa_init(void);
 void pa_fini(void);
-void pa_summarize(void);
-void pa_dump(void);
-void pa_clear_all(void);
+
 void pa_account_latency(pid_t pid, const char comm[16], uint64_t delay,
                         struct back_trace *bt);
+void pa_dump_and_clear(void);
 
 #endif

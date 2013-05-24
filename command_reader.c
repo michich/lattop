@@ -32,10 +32,9 @@ static int cr_handle_ready_fd(struct polled_reader *pr)
 		return 1;
 	}
 
-	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n"))) {
-		pa_dump();
-		pa_clear_all();
-	} else if (!memcmp(cr->buffer, "version\n", strlen("version\n")))
+	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n")))
+		pa_dump_and_clear();
+	else if (!memcmp(cr->buffer, "version\n", strlen("version\n")))
 		printf("0.4\n");
 	else if (!memcmp(cr->buffer, "help\n", strlen("help\n")))
 		printf("dump, version, help, quit\n");
