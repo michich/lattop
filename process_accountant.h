@@ -12,6 +12,8 @@ struct process_accountant {
 	struct rb_root processes;
 };
 
+extern struct process_accountant accountant;
+
 void pa_init(struct process_accountant *pa);
 void pa_fini(struct process_accountant *pa);
 void pa_summarize(struct process_accountant *pa);

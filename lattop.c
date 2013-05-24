@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lattop.h"
 #include "process_accountant.h"
 #include "sym_translator.h"
 
@@ -21,16 +20,8 @@
 
 #define NUM_READERS 2
 
-struct process_accountant accountant;
-
 static struct polled_reader *readers[NUM_READERS];
 static int should_quit;
-
-void lattop_dump(void)
-{
-	pa_dump(&accountant);
-	pa_clear_all(&accountant);
-}
 
 static int main_loop(void)
 {

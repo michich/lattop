@@ -27,7 +27,6 @@
 
 #include "perf_reader.h"
 
-#include "lattop.h"
 #include "process_accountant.h"
 #include "back_trace.h"
 

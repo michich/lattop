@@ -9,7 +9,8 @@
 #include <unistd.h>
 
 #include "command_reader.h"
-#include "lattop.h"
+
+#include "process_accountant.h"
 
 static int cr_get_fd(struct polled_reader *pr)
 {
@@ -31,9 +32,10 @@ static int cr_handle_ready_fd(struct polled_reader *pr)
 		return 1;
 	}
 
-	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n")))
-		lattop_dump();
-	else if (!memcmp(cr->buffer, "version\n", strlen("version\n")))
+	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n"))) {
+		pa_dump(&accountant);
+		pa_clear_all(&accountant);
+	} else if (!memcmp(cr->buffer, "version\n", strlen("version\n")))
 		printf("0.4\n");
 	else if (!memcmp(cr->buffer, "help\n", strlen("help\n")))
 		printf("dump, version, help, quit\n");

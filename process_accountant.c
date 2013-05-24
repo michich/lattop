@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include "process_accountant.h"
 
+struct process_accountant accountant;
+
 static void pa_delete_rbtree(struct rb_node *n)
 {
 	struct process *p;

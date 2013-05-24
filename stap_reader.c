@@ -18,7 +18,6 @@
 #include "stap_reader.h"
 
 #include "back_trace.h"
-#include "lattop.h"
 #include "process_accountant.h"
 
 static int stap_reader_start(struct polled_reader *pr)
