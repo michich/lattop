@@ -7,7 +7,6 @@
 #define _APP_H
 
 void lattop_dump(void);
-void lattop_quit(void);
 struct process_accountant *lattop_getPA(void);
 
 #endif

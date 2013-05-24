@@ -31,11 +31,6 @@ void lattop_dump(void)
 	pa_clear_all(&accountant);
 }
 
-void lattop_quit(void)
-{
-	should_quit = 1;
-}
-
 struct process_accountant *lattop_getPA(void)
 {
 	return &accountant;
