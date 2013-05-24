@@ -92,8 +92,6 @@ static int init(void)
 	if (r)
 		fprintf(stderr, "Warning: Failed to load latencytop translations.\n");
 
-	lat_translator_dump();
-
 	pa_init();
 
 	i = 0;

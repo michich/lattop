@@ -145,7 +145,7 @@ int lat_translator_lookup(const char *symbol, const char **translation, int *pri
 	return 0;
 }
 
-void lat_translator_dump(void)
+/*void lat_translator_dump(void)
 {
 	struct rb_node *node;
 	struct symbol_translation *st;
@@ -153,7 +153,7 @@ void lat_translator_dump(void)
 		st = rb_entry(node, struct symbol_translation, rb_node);
 		printf("%d %s => %s\n", st->prio, st->symbol, st->translation);
 	}
-}
+}*/
 
 int lat_translator_init(void)
 {

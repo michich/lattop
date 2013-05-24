@@ -8,7 +8,7 @@
 
 int  lat_translator_init(void);
 void lat_translator_fini(void);
-void lat_translator_dump(void);
+/*void lat_translator_dump(void);*/
 int lat_translator_lookup(const char *symbol, const char **translation, int *prio);
 
 #endif
