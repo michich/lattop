@@ -12,6 +12,15 @@
 
 #include "process_accountant.h"
 
+#define READER_BUFLEN 100
+
+struct command_reader {
+	/* must be first */
+	struct polled_reader pr;
+
+	char buffer[READER_BUFLEN];
+};
+
 static int cr_get_fd(struct polled_reader *pr)
 {
 	return STDIN_FILENO;

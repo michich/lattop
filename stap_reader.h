@@ -9,16 +9,6 @@
 
 #include "polled_reader.h"
 
-struct stap_reader {
-	/* must be first */
-	struct polled_reader pr;
-
-	FILE *stap_popen;
-
-	char *line;
-	size_t len;
-};
-
 struct polled_reader *stap_reader_new(void);
 
 #endif

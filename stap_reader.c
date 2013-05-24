@@ -20,6 +20,16 @@
 #include "back_trace.h"
 #include "process_accountant.h"
 
+struct stap_reader {
+	/* must be first */
+	struct polled_reader pr;
+
+	FILE *stap_popen;
+
+	char *line;
+	size_t len;
+};
+
 static int stap_reader_start(struct polled_reader *pr)
 {
 	struct stap_reader *r = (struct stap_reader*) pr;

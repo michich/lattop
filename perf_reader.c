@@ -39,6 +39,21 @@
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 
+struct mmap_data {
+	void			*base;
+	int			mask;
+	unsigned int		prev;
+};
+
+struct perf_reader {
+	/* must be first */
+	struct polled_reader pr;
+
+	struct mmap_data md;
+	int fds[MAX_NR_CPUS]; /* perf event fds */
+	int nr_cpus;
+};
+
 static pid_t mypid;
 static int   pagesize;
 static int trace_type;
