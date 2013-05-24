@@ -134,7 +134,7 @@ const char *sym_translator_lookup(unsigned long ip)
 		return NULL;
 }
 
-void sym_translator_dump(void)
+/*void sym_translator_dump(void)
 {
 	struct rb_node *node;
 	struct symbol *s;
@@ -142,7 +142,7 @@ void sym_translator_dump(void)
 		s = rb_entry(node, struct symbol, rb_node);
 		printf("%lx => %s\n", s->addr, s->name);
 	}
-}
+}*/
 
 int sym_translator_init(void)
 {

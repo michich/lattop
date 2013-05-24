@@ -8,7 +8,7 @@
 
 int  sym_translator_init(void);
 void sym_translator_fini(void);
-void sym_translator_dump(void);
+/*void sym_translator_dump(void);*/
 const char *sym_translator_lookup(unsigned long ip);
 
 #endif
