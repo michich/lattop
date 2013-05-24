@@ -52,6 +52,8 @@ static int main_loop(void)
 				r = readers[i]->ops->handle_ready_fd(readers[i]);
 				if (r) {
 					should_quit = 1;
+					if (r > 0)
+						r = 0;
 					break;
 				}
 			}
