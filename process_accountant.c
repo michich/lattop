@@ -49,8 +49,8 @@ void pa_dump_and_clear(void)
 	pa_clear();
 }
 
-static struct process *__search_process(pid_t tid, struct rb_node **pparent,
-					struct rb_node ***plink)
+static struct process *search_process(pid_t tid, struct rb_node **pparent,
+				      struct rb_node ***plink)
 {
 	struct rb_node **p = &accountant.processes.rb_node;
 	struct rb_node *parent = NULL;
@@ -81,7 +81,7 @@ void pa_account_latency(pid_t pid, pid_t tid, const char comm[16], uint64_t dela
 	struct rb_node *parent;
 	struct rb_node **link;
 
-	process = __search_process(tid, &parent, &link);
+	process = search_process(tid, &parent, &link);
 	if (!process) {
 		process = process_new(pid, tid, comm);
 		rb_link_node(&process->rb_node, parent, link);

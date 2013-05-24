@@ -76,10 +76,10 @@ void process_summarize(struct process *p)
  * If not, returns NULL, and sets the 'parent' and 'link' pointers to where
  * the newly created node should be put.
  */
-static struct bt2la *__rb_search_bt2la(struct process *process,
-                                       struct back_trace *bt,
-                                       struct rb_node **pparent,
-                                       struct rb_node ***plink)
+static struct bt2la *rb_search_bt2la(struct process *process,
+                                     struct back_trace *bt,
+                                     struct rb_node **pparent,
+                                     struct rb_node ***plink)
 {
 	struct rb_node **p = &process->bt2la_map.rb_node;
 	struct rb_node *parent = NULL;
@@ -112,7 +112,7 @@ void process_suffer_latency(struct process *p, uint64_t delay,
 	struct rb_node *parent;
 	struct rb_node **link;
 
-	item = __rb_search_bt2la(p, bt, &parent, &link);
+	item = rb_search_bt2la(p, bt, &parent, &link);
 	if (item) {
 		la_add_delay(&item->la, delay);
 		return;
