@@ -45,23 +45,21 @@ static void la_sum_delay(struct latency_account *la,
 void process_dump(struct process *p)
 {
 	struct rb_node *node;
-	char buf[1000];
+	char sym_bt[1000], total[32], max[32];
 
-	printf("PID: %d  TID: %d  comm: %s\n", p->pid, p->tid, p->comm);
+	format_timespan(total, 32, p->summarized.total/1000, 0);
+	format_timespan(max,   32, p->summarized.max/1000,   0);
+
+	printf("%s (PID:%d TID:%d) Total=%s Max=%s Count=%d:\n", p->comm, p->pid, p->tid, total, max, p->summarized.count);
 
 	for (node = rb_first(&p->bt2la_map); node; node = rb_next(node)) {
 		struct bt2la *bt2la = rb_entry(node, struct bt2la, rb_node);
-		bt_save_symbolic(&bt2la->bt, buf, sizeof(buf));
-		printf(" Trace: %s\n", buf);
-		printf(" Reason: %s\n", lat_translator_translate_stack(buf) ?: "<unknown>");
-		printf(" Total: %s\n", format_timespan(buf, 32, bt2la->la.total/1000, 0));
-		printf(" Max  : %s\n", format_timespan(buf, 32, bt2la->la.max/1000, 0));
-		printf(" Count: %d\n",  bt2la->la.count);
-	}
+		bt_save_symbolic(&bt2la->bt, sym_bt, sizeof(sym_bt));
+		format_timespan(total, 32, bt2la->la.total/1000, 0);
+		format_timespan(max,   32, bt2la->la.max/1000,   0);
 
-	printf("Total: %s\n", format_timespan(buf, 32, p->summarized.total/1000, 0));
-	printf("Max  : %s\n", format_timespan(buf, 32, p->summarized.max/1000, 0));
-	printf("Count: %d\n",  p->summarized.count);
+		printf(" %s (Total=%s Max=%s Count=%d)\n", lat_translator_translate_stack(sym_bt) ?: sym_bt, total, max, bt2la->la.count);
+	}
 }
 
 void process_summarize(struct process *p)
