@@ -11,12 +11,6 @@
 #include "command_reader.h"
 #include "lattop.h"
 
-static int cr_start(struct polled_reader *pr)
-{
-//	cout << "> " << flush;
-	return 0;
-}
-
 static int cr_get_fd(struct polled_reader *pr)
 {
 	return STDIN_FILENO;
@@ -34,27 +28,22 @@ static int cr_handle_ready_fd(struct polled_reader *pr)
 	} else if (nread == 0) {
 		/* EOF */
 		printf("\n");
-		lattop_quit();
-		return 0;
+		return 1;
 	}
 
-	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n"))) {
+	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n")))
 		lattop_dump();
-	} else if (!memcmp(cr->buffer, "version\n", strlen("version\n"))) {
+	else if (!memcmp(cr->buffer, "version\n", strlen("version\n")))
 		printf("0.4\n");
-	} else if (!memcmp(cr->buffer, "help\n", strlen("help\n"))) {
+	else if (!memcmp(cr->buffer, "help\n", strlen("help\n")))
 		printf("dump, version, help, quit\n");
-	} else if (!memcmp(cr->buffer, "quit\n", strlen("quit\n"))) {
-		lattop_quit();
-		return 0;
-	}
+	else if (!memcmp(cr->buffer, "quit\n", strlen("quit\n")))
+		return 1;
 
-//	cout << "> " << flush;
 	return 0;
 }
 
 static const struct polled_reader_ops command_reader_ops = {
-	.start = cr_start,
 	.get_fd = cr_get_fd,
 	.handle_ready_fd = cr_handle_ready_fd,
 };

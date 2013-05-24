@@ -25,6 +25,23 @@ static struct polled_reader *readers[NUM_READERS];
 static struct process_accountant accountant;
 static int should_quit;
 
+void lattop_dump(void)
+{
+	pa_dump(&accountant);
+	pa_clear_all(&accountant);
+}
+
+void lattop_quit(void)
+{
+	should_quit = 1;
+}
+
+struct process_accountant *lattop_getPA(void)
+{
+	return &accountant;
+}
+
+
 static int main_loop(void)
 {
 	struct pollfd fds[NUM_READERS];
@@ -59,22 +76,6 @@ static int main_loop(void)
 	}
 
 	return r;
-}
-
-void lattop_dump(void)
-{
-	pa_dump(&accountant);
-	pa_clear_all(&accountant);
-}
-
-void lattop_quit(void)
-{
-	should_quit = 1;
-}
-
-struct process_accountant *lattop_getPA(void)
-{
-	return &accountant;
 }
 
 static void fini(void)
@@ -114,9 +115,13 @@ static int init(void)
 			goto err;
 		}
 
+		if (!readers[i]->ops->start)
+			continue;
+
 		r = readers[i]->ops->start(readers[i]);
 		if (r) {
-			fprintf(stderr, "Failed to start reader #%d: %s\n", i, strerror(-r));
+			fprintf(stderr, "Failed to start reader #%d: %s\n",
+			                i, strerror(-r));
 			goto err;
 		}
 	}
@@ -125,7 +130,8 @@ static int init(void)
 	schedp.sched_priority = 10;
 	r = sched_setscheduler(0, SCHED_FIFO, &schedp);
 	if (r < 0)
-		fprintf(stderr, "Warning: Failed to set real-time scheduling policy: %s\n", strerror(errno));
+		fprintf(stderr, "Warning: Failed to set real-time scheduling policy: %s\n",
+		                strerror(errno));
 
 	return 0;
 err:
