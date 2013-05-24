@@ -6,7 +6,8 @@
 #ifndef _APP_H
 #define _APP_H
 
+extern struct process_accountant accountant;
+
 void lattop_dump(void);
-struct process_accountant *lattop_getPA(void);
 
 #endif

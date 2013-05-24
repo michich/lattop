@@ -21,8 +21,9 @@
 
 #define NUM_READERS 2
 
+struct process_accountant accountant;
+
 static struct polled_reader *readers[NUM_READERS];
-static struct process_accountant accountant;
 static int should_quit;
 
 void lattop_dump(void)
@@ -30,12 +31,6 @@ void lattop_dump(void)
 	pa_dump(&accountant);
 	pa_clear_all(&accountant);
 }
-
-struct process_accountant *lattop_getPA(void)
-{
-	return &accountant;
-}
-
 
 static int main_loop(void)
 {
