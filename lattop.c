@@ -61,8 +61,10 @@ static int main_loop(void)
 			return 1;
 		}
 
+#if 0
 		/* always process latest events in perf_reader */
 		fds[0].revents |= POLLIN;
+#endif
 	
 		for (i = 0; i < NUM_READERS; i++) {
 			if (fds[i].revents) {
