@@ -6,8 +6,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "process.h"
+
 #include "timespan.h"
+#include "lat_translator.h"
 
 static void la_clear(struct latency_account *la)
 {
@@ -42,13 +45,15 @@ static void la_sum_delay(struct latency_account *la,
 void process_dump(struct process *p)
 {
 	struct rb_node *node;
-	char buf[32];
+	char buf[1000];
 
 	printf("PID: %d  TID: %d  comm: %s\n", p->pid, p->tid, p->comm);
 
 	for (node = rb_first(&p->bt2la_map); node; node = rb_next(node)) {
 		struct bt2la *bt2la = rb_entry(node, struct bt2la, rb_node);
-		printf(" Trace: "); bt_dump(&bt2la->bt); printf("\n");
+		bt_save_symbolic(&bt2la->bt, buf, sizeof(buf));
+		printf(" Trace: %s\n", buf);
+		printf(" Reason: %s\n", lat_translator_translate_stack(buf) ?: "<unknown>");
 		printf(" Total: %s\n", format_timespan(buf, 32, bt2la->la.total/1000, 0));
 		printf(" Max  : %s\n", format_timespan(buf, 32, bt2la->la.max/1000, 0));
 		printf(" Count: %d\n",  bt2la->la.count);

@@ -14,6 +14,6 @@ struct back_trace {
 
 void bt_init(struct back_trace *b, const long tr[], int len);
 int  bt_compare(const struct back_trace *b1, const struct back_trace *b2);
-void bt_dump(const struct back_trace *b);
+void bt_save_symbolic(const struct back_trace *b, char *buf, size_t buflen);
 
 #endif

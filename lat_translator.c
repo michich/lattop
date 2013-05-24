@@ -145,6 +145,39 @@ int lat_translator_lookup(const char *symbol, const char **translation, int *pri
 	return 0;
 }
 
+const char *lat_translator_translate_stack(char *symbolic_stack_trace)
+{
+	const char *translation, *best_translation = NULL;
+	char *p;
+	size_t len;
+	int prio, best_prio = INT_MIN;
+	char tmp;
+
+	p = symbolic_stack_trace;
+	while (*p) {
+		/* skip spaces */
+		p += strspn(p, " ");
+		if (*p == '\0')
+			break;
+
+		/* isolate single symbol */
+		len = strcspn(p, " ");
+		tmp = p[len];
+		p[len] = '\0'; /* cut */
+
+		if (lat_translator_lookup(p, &translation, &prio) == 0 &&
+		    prio > best_prio) {
+			best_prio = prio;
+			best_translation = translation;
+		}
+
+		p[len] = tmp; /* uncut */
+		p += len;
+	}
+
+	return best_translation ?: NULL;
+}
+
 /*void lat_translator_dump(void)
 {
 	struct rb_node *node;
