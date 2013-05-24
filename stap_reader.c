@@ -16,8 +16,10 @@
 #include <unistd.h>
 
 #include "stap_reader.h"
+
 #include "back_trace.h"
 #include "lattop.h"
+#include "process_accountant.h"
 
 static int stap_reader_start(struct polled_reader *pr)
 {
@@ -76,7 +78,7 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 		}
 	}
 
-	pa_account_latency(app_getPA(), pid, comm, delay, &bt);
+	pa_account_latency(lattop_getPA(), pid, comm, delay, &bt);
 
 	return 0;
 }

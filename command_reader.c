@@ -34,18 +34,18 @@ static int cr_handle_ready_fd(struct polled_reader *pr)
 	} else if (nread == 0) {
 		/* EOF */
 		printf("\n");
-		app_quit();
+		lattop_quit();
 		return 0;
 	}
 
 	if (!memcmp(cr->buffer, "\n", strlen("\n")) || !memcmp(cr->buffer, "dump\n", strlen("dump\n"))) {
-		app_dump();
+		lattop_dump();
 	} else if (!memcmp(cr->buffer, "version\n", strlen("version\n"))) {
 		printf("0.4\n");
 	} else if (!memcmp(cr->buffer, "help\n", strlen("help\n"))) {
 		printf("dump, version, help, quit\n");
 	} else if (!memcmp(cr->buffer, "quit\n", strlen("quit\n"))) {
-		app_quit();
+		lattop_quit();
 		return 0;
 	}
 

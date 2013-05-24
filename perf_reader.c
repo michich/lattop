@@ -19,14 +19,17 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "perf_reader.h"
-#include "back_trace.h"
+
 #include "lattop.h"
+#include "process_accountant.h"
+#include "back_trace.h"
 
 #include "cpumap.h"
 #include "perf.h"
@@ -262,7 +265,7 @@ static int parse_event(const struct sample_event *e)
 	struct back_trace bt;
 	bt_init(&bt, e->backtrace, LT_BACKTRACEDEPTH);
 
-	pa_account_latency(app_getPA(),
+	pa_account_latency(lattop_getPA(),
 		e->tgid,  // userspace's pid is kernel's tgid
 		e->comm,
 		e->delay,

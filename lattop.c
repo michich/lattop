@@ -12,7 +12,12 @@
 #include <stdlib.h>
 
 #include "lattop.h"
+#include "process_accountant.h"
 #include "sym_translator.h"
+
+#include "polled_reader.h"
+#include "command_reader.h"
+#include "stap_reader.h"
 
 #define NUM_READERS 2
 
@@ -56,18 +61,18 @@ static int main_loop(void)
 	return r;
 }
 
-void app_dump(void)
+void lattop_dump(void)
 {
 	pa_dump(&accountant);
 	pa_clear_all(&accountant);
 }
 
-void app_quit(void)
+void lattop_quit(void)
 {
 	should_quit = 1;
 }
 
-struct process_accountant *app_getPA(void)
+struct process_accountant *lattop_getPA(void)
 {
 	return &accountant;
 }
