@@ -25,7 +25,7 @@ int bt_compare(const struct back_trace *b1, const struct back_trace *b2)
 void bt_dump(const struct back_trace *b)
 {
 	const char *translation, *best_translation = NULL;
-	int prio, best_prio = 0;
+	int prio, best_prio = INT_MIN;
 	int i;
 	for (i = 0; i < MAX_BT_LEN; i++) {
 		if (b->trace[i] == 0 || b->trace[i] == ULONG_MAX)
