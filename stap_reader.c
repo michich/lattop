@@ -17,7 +17,7 @@
 
 #include "stap_reader.h"
 #include "back_trace.h"
-#include "app.h"
+#include "lattop.h"
 
 static int stap_reader_start(struct polled_reader *pr)
 {

@@ -26,7 +26,7 @@
 
 #include "perf_reader.h"
 #include "back_trace.h"
-#include "app.h"
+#include "lattop.h"
 
 #include "cpumap.h"
 #include "perf.h"

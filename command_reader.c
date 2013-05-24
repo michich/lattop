@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #include "command_reader.h"
-#include "app.h"
+#include "lattop.h"
 
 static int cr_start(struct polled_reader *pr)
 {
