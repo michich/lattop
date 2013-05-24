@@ -3,7 +3,7 @@
 
 #define MAX_NR_CPUS 256
 
-extern int read_cpu_map(void);
+int read_cpu_map(void);
 extern int cpumap[];
 
 #endif /* __PERF_CPUMAP_H */
