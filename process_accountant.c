@@ -40,8 +40,7 @@ void pa_dump_and_clear(void)
 	struct process *process;
 	for (node = rb_first(&accountant.processes); node; node = rb_next(node)) {
 		process = rb_entry(node, struct process, rb_node);
-		printf("PID: %d\n", process->pid);
-		printf("comm: %s\n", process->comm);
+		printf("PID: %d  TID: %d  comm: %s\n", process->pid, process->tid, process->comm);
 		process_summarize(process);
 		process_dump(process);
 		printf("\n");
@@ -51,7 +50,7 @@ void pa_dump_and_clear(void)
 	pa_clear();
 }
 
-static struct process *__search_process(pid_t pid, struct rb_node **pparent,
+static struct process *__search_process(pid_t tid, struct rb_node **pparent,
 					struct rb_node ***plink)
 {
 	struct rb_node **p = &accountant.processes.rb_node;
@@ -62,9 +61,9 @@ static struct process *__search_process(pid_t pid, struct rb_node **pparent,
 		parent = *p;
 		process = rb_entry(parent, struct process, rb_node);
 
-		if (pid < process->pid)
+		if (tid < process->tid)
 			p = &(*p)->rb_left;
-		else if (pid > process->pid)
+		else if (tid > process->tid)
 			p = &(*p)->rb_right;
 		else
 			return process;
@@ -76,16 +75,16 @@ static struct process *__search_process(pid_t pid, struct rb_node **pparent,
 	return NULL;
 }
 
-void pa_account_latency(pid_t pid, const char comm[16], uint64_t delay,
+void pa_account_latency(pid_t pid, pid_t tid, const char comm[16], uint64_t delay,
                         struct back_trace *bt)
 {
 	struct process *process;
 	struct rb_node *parent;
 	struct rb_node **link;
 
-	process = __search_process(pid, &parent, &link);
+	process = __search_process(tid, &parent, &link);
 	if (!process) {
-		process = process_new(pid, comm);
+		process = process_new(pid, tid, comm);
 		rb_link_node(&process->rb_node, parent, link);
 		rb_insert_color(&process->rb_node, &accountant.processes);
 	}

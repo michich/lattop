@@ -281,6 +281,7 @@ static int parse_event(const struct sample_event *e)
 
 	pa_account_latency(
 		e->tgid,  // userspace's pid is kernel's tgid
+		e->pid,
 		e->comm,
 		e->delay,
 		&bt);

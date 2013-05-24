@@ -87,7 +87,7 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 		}
 	}
 
-	pa_account_latency(pid, comm, delay, &bt);
+	pa_account_latency(pid, tid, comm, delay, &bt);
 
 	return 0;
 }

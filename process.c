@@ -124,7 +124,7 @@ void process_suffer_latency(struct process *p, uint64_t delay,
 }
 
 
-struct process *process_new(pid_t pid, const char comm[16])
+struct process *process_new(pid_t pid, pid_t tid, const char comm[16])
 {
 	struct process *p;
 	p = malloc(sizeof(struct process));
@@ -132,6 +132,7 @@ struct process *process_new(pid_t pid, const char comm[16])
 		return NULL;
 	p->bt2la_map = RB_ROOT;
 	p->pid = pid;
+	p->tid = tid;
 	strcpy(p->comm, comm);
 	la_clear(&p->summarized);
 	return p;

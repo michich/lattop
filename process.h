@@ -28,13 +28,14 @@ struct process {
 	struct rb_node rb_node;		/* tree of processes, sorted by pid */
 	struct rb_root bt2la_map;	/* this process's latencies, sorted by the backtrace */
 	pid_t pid;
+	pid_t tid;
 	char comm[16];
 	struct latency_account summarized;
 };
 
 void process_suffer_latency(struct process *p, uint64_t delay,
                             struct back_trace *bt);
-struct process *process_new(pid_t pid, const char comm[16]);
+struct process *process_new(pid_t pid, pid_t tid, const char comm[16]);
 void process_summarize(struct process *p);
 void process_dump(struct process *p);
 void process_fini(struct process *p);
