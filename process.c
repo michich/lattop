@@ -73,7 +73,7 @@ void process_dump(struct process *p)
 {
 	struct rb_node *node;
 	struct bt2la **array;
-	char sym_bt[1000], commpidtid[32], total[32], max[32], avg[32];
+	char sym_bt[1000], commpidtid[32], total[32], max[32];
 	unsigned n = 0;
 
 	static int (*const sort_func[_NR_SORT_BY])(const void *, const void *) = {
@@ -90,7 +90,7 @@ void process_dump(struct process *p)
 	else
 		sprintf(commpidtid, "%s (%d)", p->comm, p->pid);
 
-	printf("%-40s Max:%8s Total:%8s\n", commpidtid, max, total);
+	printf("%-44s Max:%8s Total:%8s\n", commpidtid, max, total);
 
 	array = alloca(sizeof(struct bt2la*) * p->bt2la_count);
 
@@ -103,7 +103,7 @@ void process_dump(struct process *p)
 	qsort(array, n, sizeof(struct bt2la*), sort_func[arg_sort]);
 
 	for (n = 0; n < p->bt2la_count; n++) {
-		struct bt2la *bt2la = array[n];
+		struct bt2la *bt2la = array[!arg_reverse ? n : p->bt2la_count - n - 1];
 		double percentage = (bt2la->la.total*100.0)/p->summarized.total;
 		const char *translation;
 
@@ -120,9 +120,8 @@ void process_dump(struct process *p)
 
 		format_ms(total, 32, bt2la->la.total/1000);
 		format_ms(max,   32, bt2la->la.max/1000);
-		format_ms(avg,   32, bt2la->la.total/bt2la->la.count/1000);
 
-		printf("%-44s %5.1f%% Max:%8s Avg:%8s\n", translation ?: sym_bt, percentage, max, avg);
+		printf(" %-44s Max:%8s %5.1f%%\n", translation ?: sym_bt, max, percentage);
 	}
 }
 
