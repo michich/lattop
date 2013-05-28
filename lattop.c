@@ -22,6 +22,7 @@
 #include "polled_reader.h"
 #include "timer_reader.h"
 #include "stap_reader.h"
+#include "timespan.h"
 
 #define MAX_READERS 2
 
@@ -29,8 +30,8 @@ int arg_interval = 5;
 int arg_count;
 enum sort_by arg_sort = SORT_BY_MAX_LATENCY;
 bool arg_reverse;
-unsigned long arg_min_delay_us;
-unsigned long arg_max_interruptible_delay_us = 5000;
+unsigned long long arg_min_delay;
+unsigned long long arg_max_interruptible_delay = 5*NSEC_PER_MSEC;
 
 static struct polled_reader *readers[MAX_READERS];
 static struct pollfd poll_fds[MAX_READERS];

@@ -18,7 +18,7 @@ extern int arg_interval;
 extern int arg_count;
 extern enum sort_by arg_sort;
 extern bool arg_reverse;
-extern unsigned long arg_min_delay_us;
-extern unsigned long arg_max_interruptible_delay_us;
+extern unsigned long long arg_min_delay;
+extern unsigned long long arg_max_interruptible_delay;
 
 #endif
