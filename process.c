@@ -110,9 +110,9 @@ void process_dump(struct process *p)
 		bt_save_symbolic(&bt2la->bt, sym_bt+1, sizeof(sym_bt)-1);
 		translation = lat_translator_translate_stack(sym_bt+1);
 		if (!translation) {
-			/* XXX safety */
-			size_t end = strcspn(sym_bt+1, " ");
+			size_t end = strnlen(sym_bt+1, 42);
 			sym_bt[0] = '[';
+			/* this is safe, because sym_bt array is way larger than our strnlen limit above */
 			sym_bt[end+1] = ']';
 			sym_bt[end+2] = '\0';
 		}
