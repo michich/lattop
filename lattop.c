@@ -99,6 +99,8 @@ static int init(void)
 	readers[i++] = command_reader_new();
 	assert(i == NUM_READERS);
 
+	printf("Starting...\n");
+
 	for (i = 0; i < NUM_READERS; i++) {
 		if (!readers[i]) {
 			fprintf(stderr, "Out of memory.\n");

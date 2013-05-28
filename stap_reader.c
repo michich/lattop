@@ -25,6 +25,7 @@ struct stap_reader {
 	struct polled_reader pr;
 
 	FILE *stap_popen;
+	enum { STAP_STARTING, STAP_RUNNING } state;
 
 	char *line;
 	size_t len;
@@ -62,6 +63,15 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 	n = getline(&r->line, &r->len, r->stap_popen);
 	if (n <= 0)
 		return -1;
+
+	if (r->state == STAP_STARTING) {
+		if (strcmp(r->line, "lat begin\n"))
+			return -1;
+
+		r->state = STAP_RUNNING;
+		printf("Systemtap probe is now active.\n");
+		return 0;
+	}
 
 	if (sscanf(r->line, "%c %lu %lu %lu %15[^\n]", &sleep_or_block, &delay, &pid, &tid, comm) != 5)
 		return -1;

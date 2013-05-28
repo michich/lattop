@@ -58,3 +58,7 @@ probe kernel.trace("sched_stat_blocked") {
 		       task_stack_trace($tsk));
 	}
 }
+
+probe begin {
+	printf("lat begin\n");
+}
