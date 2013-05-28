@@ -25,7 +25,7 @@ struct bt2la {
 };
 
 struct process {
-	struct rb_node rb_node;		/* tree of processes, sorted by pid */
+	struct rb_node rb_node;		/* tree of processes, sorted by tid */
 	struct rb_root bt2la_map;	/* this process's latencies, sorted by the backtrace */
 	pid_t pid;
 	pid_t tid;
