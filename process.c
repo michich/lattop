@@ -41,7 +41,6 @@ static void la_sum_delay(struct latency_account *la,
 	la->count += other->count;
 }
 
-
 void process_dump(struct process *p)
 {
 	struct rb_node *node;

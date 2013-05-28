@@ -12,14 +12,15 @@
 
 int bt_compare(const struct back_trace *b1, const struct back_trace *b2)
 {
-	int i;
+/*	int i;
 	for (i = 0; i < MAX_BT_LEN; i++) {
 		if (b1->trace[i] < b2->trace[i])
 			return -1;
 		if (b1->trace[i] > b2->trace[i])
 			return +1;
 	}
-	return 0;
+	return 0;*/
+	return memcmp(b1->trace, b2->trace, sizeof(b1->trace));
 }
 
 void bt_save_symbolic(const struct back_trace *b, char *buf, size_t buflen)
