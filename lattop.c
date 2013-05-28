@@ -161,7 +161,15 @@ err:
 
 static void usage_and_exit(int code)
 {
-	fprintf(stderr, "Usage: lattop [-i INTERVAL] [-c COUNT]\n");
+	fprintf(stderr,
+"Usage: lattop [-i INTERVAL] [-c COUNT] [-s SORT_BY] [-r]\n"
+"  -i, --interval=INTERVAL      time in seconds between measurements (default: 5)\n"
+"  -c, --count=COUNT            stop after COUNT measurements\n"
+"  -s, --sort=SORT_BY           sort the output by one of:\n"
+"                                'max'      maximum latency (default)\n"
+"                                'total'    total latency\n"
+"                                'pid'      pid of the process\n"
+"  -r, --reverse                reverse the sort order\n");
 	exit(code);
 }
 
