@@ -19,6 +19,7 @@
 
 #include "back_trace.h"
 #include "process_accountant.h"
+#include "lattop.h"
 
 struct stap_reader {
 	/* must be first */
@@ -70,6 +71,7 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 
 		r->state = STAP_RUNNING;
 		printf("Systemtap probe is now active.\n");
+		lattop_reader_started(pr);
 		return 0;
 	}
 

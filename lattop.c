@@ -17,31 +17,62 @@
 #include "lat_translator.h"
 
 #include "polled_reader.h"
-#include "command_reader.h"
+#include "timer_reader.h"
 #include "stap_reader.h"
 
-#define NUM_READERS 2
-
-static struct polled_reader *readers[NUM_READERS];
-static int should_quit;
+#define MAX_READERS 2
 
 static int arg_interval = 5;
 static int arg_count;
 
+static struct polled_reader *readers[MAX_READERS];
+static struct pollfd poll_fds[MAX_READERS];
+static unsigned num_readers;
+
+static int should_quit;
+
+static int start_reader(unsigned index)
+{
+	int r;
+
+	if (!readers[index]) {
+		fprintf(stderr, "Out of memory.\n");
+		return -ENOMEM;
+	}
+
+	if (readers[index]->ops->start) {
+		r = readers[index]->ops->start(readers[index]);
+		if (r) {
+			fprintf(stderr, "Failed to start reader #%d: %s\n",
+				index, strerror(-r));
+			return r;
+		}
+	}
+
+	poll_fds[index].fd = readers[index]->ops->get_fd(readers[index]);
+	poll_fds[index].events = POLLIN;
+	return 0;
+}
+
+void lattop_reader_started(struct polled_reader *r)
+{
+	/* stap reader */
+	assert(readers[0] == r);
+	assert(num_readers == 1);
+	assert(num_readers < MAX_READERS);
+
+	readers[num_readers] = timer_reader_new(arg_interval, arg_count);
+	start_reader(num_readers);
+	num_readers++;
+}
+
 static int main_loop(void)
 {
-	struct pollfd fds[NUM_READERS];
 	int nready, i;
 	int r = 0;
 
-	memset(fds, 0, sizeof(fds));
-	for (i = 0; i < NUM_READERS; i++) {
-		fds[i].fd = readers[i]->ops->get_fd(readers[i]);
-		fds[i].events = POLLIN;
-	}
-
 	while (!should_quit) {
-		nready = poll(fds, NUM_READERS, -1);
+		nready = poll(poll_fds, num_readers, -1);
 		if (nready < 0) {
 			perror("poll");
 			return 1;
@@ -52,15 +83,16 @@ static int main_loop(void)
 		fds[0].revents |= POLLIN;
 #endif
 	
-		for (i = 0; i < NUM_READERS; i++) {
-			if (fds[i].revents) {
-				r = readers[i]->ops->handle_ready_fd(readers[i]);
-				if (r) {
-					should_quit = 1;
-					if (r > 0)
-						r = 0;
-					break;
-				}
+		for (i = 0; i < num_readers; i++) {
+			if (!poll_fds[i].revents)
+				continue;
+
+			r = readers[i]->ops->handle_ready_fd(readers[i]);
+			if (r) {
+				should_quit = 1;
+				if (r > 0)
+					r = 0;
+				break;
 			}
 		}
 	}
@@ -71,7 +103,7 @@ static int main_loop(void)
 static void fini(void)
 {
 	int i;
-	for (i = 0; i < NUM_READERS; i++) {
+	for (i = 0; i < num_readers; i++) {
 		if (readers[i]->ops->fini)
 			readers[i]->ops->fini(readers[i]);
 		free(readers[i]);
@@ -98,29 +130,15 @@ static int init(void)
 
 	pa_init();
 
-	i = 0;
-	readers[i++] = stap_reader_new();
-	readers[i++] = command_reader_new();
-	assert(i == NUM_READERS);
+	assert(num_readers < MAX_READERS);
+	readers[num_readers++] = stap_reader_new();
 
 	printf("Starting...\n");
 
-	for (i = 0; i < NUM_READERS; i++) {
-		if (!readers[i]) {
-			fprintf(stderr, "Out of memory.\n");
-			r = -ENOMEM;
+	for (i = 0; i < num_readers; i++) {
+		r = start_reader(i);
+		if (r < 0)
 			goto err;
-		}
-
-		if (!readers[i]->ops->start)
-			continue;
-
-		r = readers[i]->ops->start(readers[i]);
-		if (r) {
-			fprintf(stderr, "Failed to start reader #%d: %s\n",
-			                i, strerror(-r));
-			goto err;
-		}
 	}
 
 	memset(&schedp, 0, sizeof(schedp));

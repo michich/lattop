@@ -76,7 +76,7 @@ void process_dump(struct process *p)
 		format_ms(max,   32, bt2la->la.max/1000);
 		format_ms(avg,  32, bt2la->la.total/bt2la->la.count/1000);
 
-		printf("%-45s %5.1f%% Max:%8s Avg:%8s\n", translation ?: sym_bt, percentage, max, avg);
+		printf(" %-44s %5.1f%% Max:%8s Avg:%8s\n", translation ?: sym_bt, percentage, max, avg);
 	}
 }
 

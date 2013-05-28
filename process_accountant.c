@@ -5,6 +5,7 @@
  */
 #include <assert.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "process_accountant.h"
 
@@ -50,7 +51,10 @@ void pa_dump_and_clear(void)
 {
 	struct rb_node *node;
 	struct process *process, **array;
+	time_t cur_time;
 	unsigned n = 0;
+
+	time(&cur_time);
 
 	array = alloca(sizeof(struct process*) * count);
 
@@ -66,11 +70,10 @@ void pa_dump_and_clear(void)
 	qsort(array, count, sizeof(struct process*), compare_by_latency);
 
 	/* dump processes */
-	for (n = 0; n < count; n++) {
+	putchar('\n');
+	for (n = 0; n < count; n++)
 		process_dump(array[n]);
-		printf("\n");
-	}
-	printf("-\n");
+	printf("=== %s", ctime(&cur_time));
 
 	pa_clear();
 }
