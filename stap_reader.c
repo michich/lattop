@@ -21,6 +21,8 @@
 #include "process_accountant.h"
 #include "lattop.h"
 
+static const char stp_template[] = "/tmp/lattop-XXXXXX.stp";
+
 struct stap_reader {
 	/* must be first */
 	struct polled_reader pr;
@@ -30,16 +32,79 @@ struct stap_reader {
 
 	char *line;
 	size_t len;
+	
+	char stp_filename[sizeof(stp_template)];
 };
+
+static int fill_in(int fd, const char *source_filename)
+{
+	char buf[64*1024]; /* big enough to read and process the complete stp script */
+	char *p;
+	ssize_t len;
+	FILE *source;
+
+	source = fopen(source_filename, "re");
+	if (!source) {
+		r = -errno;
+		fprintf(stderr, "Opening %s: %m\n", source_filename);
+		return r;
+	}
+
+	len = fread(buf, 1, sizeof(buf), source);
+	fclose(source);
+	if (len == sizeof(buf)) {
+		fprintf(stderr, "File '%s' is too big", source_filename);
+		return -EFBIG;
+	}
+	
+	p = buf;
+	do {
+		char *at, *nextat;
+		at = memchr(p, '@', len);
+		if (!at)
+			break;
+
+		/* skip over non-interesting source */
+		len -= at - p;
+		p = at;
+		/* XXX at+1 */
+
+		assert(len >= 0);
+
+		/* An '@' could be the last char of the file */
+		if (len < 1)
+			break;
+
+		nextat = memchr(p + 1, '@', len - 1);
+		if (!nextat)
+			break;
+
+		
+	}
+}
 
 static int stap_reader_start(struct polled_reader *pr)
 {
-	struct stap_reader *r = (struct stap_reader*) pr;
+	struct stap_reader *sr = (struct stap_reader*) pr;
+	int fd, r;
 
-	/* TODO avoid popen, use manual pipe,fork,exec */
-	r->stap_popen = popen("stap -g lat.stp", "re");
+	memcpy(sr->stp_filename, stp_template, sizeof(sr->stp_filename));
+	fd = mkstemps(sr->stp_filename, 4);
+	if (fd < 0) {
+		r = -errno;
+		perror("Creating a temp file");
+		return r;
+	}
 
-	return r->stap_popen ? 0 : -errno;
+	r = fill_in(fd, "lat.stp.in");
+	close(fd);
+	if (r < 0)
+		return r;
+
+	/* XXX avoid popen, use manual pipe,fork,exec */
+	sr->stap_popen = popen("stap -g lat.stp", "re");
+
+	return sr->stap_popen ? 0 : -errno;
 }
 
 static int stap_reader_handle_ready_fd(struct polled_reader *pr)
@@ -57,7 +122,7 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 	char sleep_or_block;
 	bool end_of_trace;
 
-	/* TODO I don't think getline (buffered) mixes well with poll().
+	/* XXX I don't think getline (buffered) mixes well with poll().
          * Should use a non-blocking fd and read everything there is to read. */
 
 	/* 1st line - task info */
