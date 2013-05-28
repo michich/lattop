@@ -32,6 +32,7 @@ enum sort_by arg_sort = SORT_BY_MAX_LATENCY;
 bool arg_reverse;
 unsigned long long arg_min_delay;
 unsigned long long arg_max_interruptible_delay = 5*NSEC_PER_MSEC;
+unsigned long long arg_pid_filter;
 
 static struct polled_reader *readers[MAX_READERS];
 static struct pollfd poll_fds[MAX_READERS];
@@ -178,8 +179,7 @@ static void usage_and_exit(int code)
 "  -m, --min-latency=MIN        ignore latencies shorter than MIN microseconds\n"
 "  -M, --max-interruptible=MAX  ignore latencies from interruptible sleeps longer\n"
 "                               than MAX microseconds (default: 5000)\n"
-
-);
+"  -p, --pid-filter=PID         show only the process with the given PID\n");
 	exit(code);
 }
 
@@ -195,6 +195,7 @@ static void parse_argv(int argc, char *argv[])
 		{ "reverse",           no_argument,       0, 'r' },
 		{ "min-latency",       required_argument, 0, 'm' },
 		{ "max-interruptible", required_argument, 0, 'M' },
+		{ "pid-filter",        required_argument, 0, 'p' },
 		{ "help",              no_argument,       0, 'h' },
 		{ 0,                   0,                 0,  0  }
 	};
@@ -206,7 +207,7 @@ static void parse_argv(int argc, char *argv[])
 	};
 
 	for (;;) {
-		c = getopt_long(argc, argv, "i:c:s:rm:M:h", long_options, &option_index);
+		c = getopt_long(argc, argv, "i:c:s:rm:M:p:h", long_options, &option_index);
 		if (c == -1)
 			break;
 
@@ -259,6 +260,14 @@ static void parse_argv(int argc, char *argv[])
 				exit(1);
 			}
 			arg_max_interruptible_delay *= NSEC_PER_USEC;
+			break;
+		case 'p':
+			errno = 0;
+			arg_pid_filter = strtoull(optarg, &endptr, 10);
+			if (errno || endptr == optarg || *endptr != '\0') {
+				fprintf(stderr, "Invalid PID specification '%s'\n", optarg);
+				exit(1);
+			}
 			break;
 		case 'h':
 			usage_and_exit(0);

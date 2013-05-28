@@ -45,6 +45,7 @@ static const struct {
 } subst_table[] = {
 	{ "@MIN_DELAY@",               sizeof("@MIN_DELAY@")-1,               &arg_min_delay },
 	{ "@MAX_INTERRUPTIBLE_DELAY@", sizeof("@MAX_INTERRUPTIBLE_DELAY@")-1, &arg_max_interruptible_delay },
+	{ "@PID_FILTER@",              sizeof("@PID_FILTER@")-1,              &arg_pid_filter },
 };
 
 static int substitute(char buf[], size_t size, size_t *plen)

@@ -1,0 +1,68 @@
+%{
+#include <linux/stacktrace.h>
+#include <linux/latencytop.h>
+
+#ifndef LT_BACKTRACEDEPTH
+#define LT_BACKTRACEDEPTH	12
+#endif
+
+%}
+
+function task_stack_trace:string(tsk:long) %{
+	struct stack_trace trace;
+	unsigned long backtrace[LT_BACKTRACEDEPTH];
+	char *p = STAP_RETVALUE;
+	int i;
+	bool first = true;
+
+	BUILD_BUG_ON(MAXSTRINGLEN < LT_BACKTRACEDEPTH * (2 + 8*2 + 1));
+
+        memset(&trace, 0, sizeof(trace));
+        trace.max_entries = LT_BACKTRACEDEPTH;
+        trace.entries = backtrace;
+        save_stack_trace_tsk((struct task_struct*)STAP_ARG_tsk, &trace);
+
+	for (i = 0; i < LT_BACKTRACEDEPTH; i++) {
+		unsigned long record = backtrace[i];
+		if (record == 0 || record == ULONG_MAX)
+			goto finish;
+
+		if (!first)
+			*p++ = ' ';
+
+		sprintf(p, "0x%08lx", record);
+		p += 2 + 8*2;
+		first = false;
+	}
+finish:
+	*p = '\0';
+%}
+
+probe kernel.trace("sched_stat_sleep") {
+	/* Long interruptible waits are generally user-requested */
+	/* Negative sleeps are time going backwards */
+	/* Zero-time sleeps are non-interesting */
+	pid = task_pid($tsk);
+	if ((@PID_FILTER@ == 0 || @PID_FILTER@ == pid) &&
+	    $delay > @MIN_DELAY@ && $delay <= @MAX_INTERRUPTIBLE_DELAY@) {
+		printf("S %lu %lu %lu %s\n%s\n",
+		       $delay, pid, task_tid($tsk), task_execname($tsk),
+		       task_stack_trace($tsk));
+	}
+}
+
+probe kernel.trace("sched_stat_blocked") {
+	/* Negative sleeps are time going backwards */
+	/* Zero-time sleeps are non-interesting */
+	pid = task_pid($tsk);
+	if ((@PID_FILTER@ == 0 || @PID_FILTER@ == pid) &&
+	    $delay > @MIN_DELAY@) {
+		printf("B %lu %lu %lu %s\n%s\n",
+		       $delay, pid, task_tid($tsk), task_execname($tsk),
+		       task_stack_trace($tsk));
+	}
+}
+
+probe begin {
+	printf("lat begin\n");
+}

@@ -20,5 +20,6 @@ extern enum sort_by arg_sort;
 extern bool arg_reverse;
 extern unsigned long long arg_min_delay;
 extern unsigned long long arg_max_interruptible_delay;
+extern unsigned long long arg_pid_filter;
 
 #endif
