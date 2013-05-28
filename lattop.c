@@ -157,7 +157,7 @@ err:
 static void usage_and_exit(int code)
 {
 	fprintf(stderr, "Usage: lattop [-i INTERVAL] [-c COUNT]\n");
-	exit(1);
+	exit(code);
 }
 
 static void parse_argv(int argc, char *argv[])
