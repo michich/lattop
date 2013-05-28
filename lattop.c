@@ -5,6 +5,7 @@
  */
 #include <assert.h>
 #include <errno.h>
+#include <getopt.h>
 #include <poll.h>
 #include <sched.h>
 #include <string.h>
@@ -23,6 +24,9 @@
 
 static struct polled_reader *readers[NUM_READERS];
 static int should_quit;
+
+static int arg_interval = 5;
+static int arg_count;
 
 static int main_loop(void)
 {
@@ -132,9 +136,52 @@ err:
 	return r;
 }
 
-int main()
+static void usage_and_exit(int code)
+{
+	fprintf(stderr, "Usage: lattop [-i INTERVAL] [-c COUNT]\n");
+	exit(1);
+}
+
+static void parse_argv(int argc, char *argv[])
+{
+	int c, option_index = 0;
+
+	for (;;) {
+		static const struct option long_options[] = {
+			{ "interval", required_argument, 0, 'i' },
+			{ "count",    required_argument, 0, 'c' },
+			{ "help",     no_argument,       0, 'h' },
+			{ 0,          0,                 0,  0  }
+		};
+
+		c = getopt_long(argc, argv, "i:c:h", long_options, &option_index);
+		if (c == -1)
+			break;
+
+		switch (c) {
+		case 'i':
+			arg_interval = atoi(optarg);
+			break;
+		case 'c':
+			arg_count = atoi(optarg);
+			break;
+		case 'h':
+			usage_and_exit(0);
+		case '?':
+		default:
+			usage_and_exit(1);
+		}
+	}
+
+	if (optind < argc)
+		usage_and_exit(1);
+}
+
+int main(int argc, char *argv[])
 {
 	int ret;
+
+	parse_argv(argc, argv);
 
 	if (init())
 		return 1;
