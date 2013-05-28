@@ -163,8 +163,8 @@ static void usage_and_exit(int code)
 {
 	fprintf(stderr,
 "Usage: lattop [-i INTERVAL] [-c COUNT] [-s SORT_BY] [-r]\n"
-"  -i, --interval=INTERVAL      time in seconds between measurements (default: 5)\n"
-"  -c, --count=COUNT            stop after COUNT measurements\n"
+"  -i, --interval=INTERVAL      time in seconds between printouts (default: 5)\n"
+"  -c, --count=COUNT            stop after COUNT printouts\n"
 "  -s, --sort=SORT_BY           sort the output by one of:\n"
 "                                'max'      maximum latency (default)\n"
 "                                'total'    total latency\n"
@@ -222,7 +222,7 @@ static void parse_argv(int argc, char *argv[])
 			}
 
 			if (i == _NR_SORT_BY) {
-				fprintf(stderr, "Unknown sort type '%s'.\n", optarg);
+				fprintf(stderr, "Unknown sort type '%s'. Must be one of: max, total, pid\n", optarg);
 				exit(1);
 			}
 

@@ -31,6 +31,7 @@ struct process {
 	pid_t tid;
 	char comm[16];
 	struct latency_account summarized;
+	unsigned bt2la_count;
 };
 
 void process_suffer_latency(struct process *p, uint64_t delay,

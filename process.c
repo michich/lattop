@@ -3,6 +3,7 @@
  * Author: Michal Schmidt
  * License: GPLv2
  */
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,6 +12,7 @@
 
 #include "timespan.h"
 #include "lat_translator.h"
+#include "lattop.h"
 
 static void la_clear(struct latency_account *la)
 {
@@ -41,10 +43,44 @@ static void la_sum_delay(struct latency_account *la,
 	la->count += other->count;
 }
 
+static int compare_by_max_latency(const void *p1, const void *p2)
+{
+	struct bt2la *b1 = *(struct bt2la**)p1;
+	struct bt2la *b2 = *(struct bt2la**)p2;
+
+	if (b1->la.max < b2->la.max)
+		return 1;
+	else if (b1->la.max > b2->la.max)
+		return -1;
+	else
+		return 0;
+}
+
+static int compare_by_total_latency(const void *p1, const void *p2)
+{
+	struct bt2la *b1 = *(struct bt2la**)p1;
+	struct bt2la *b2 = *(struct bt2la**)p2;
+
+	if (b1->la.total < b2->la.total)
+		return 1;
+	else if (b1->la.total > b2->la.total)
+		return -1;
+	else
+		return 0;
+}
+
 void process_dump(struct process *p)
 {
 	struct rb_node *node;
+	struct bt2la **array;
 	char sym_bt[1000], commpidtid[32], total[32], max[32], avg[32];
+	unsigned n = 0;
+
+	static int (*const sort_func[_NR_SORT_BY])(const void *, const void *) = {
+		[SORT_BY_MAX_LATENCY]   = compare_by_max_latency,
+		[SORT_BY_TOTAL_LATENCY] = compare_by_total_latency,
+		[SORT_BY_PID]           = compare_by_max_latency, /* sorting by pid makes no sense within a process */
+	};
 
 	format_ms(total, 32, p->summarized.total/1000);
 	format_ms(max,   32, p->summarized.max/1000);
@@ -54,10 +90,20 @@ void process_dump(struct process *p)
 	else
 		sprintf(commpidtid, "%s (%d)", p->comm, p->pid);
 
-	printf("%-40s Max:%8s Total: %8s\n", commpidtid, max, total);
+	printf("%-40s Max:%8s Total:%8s\n", commpidtid, max, total);
+
+	array = alloca(sizeof(struct bt2la*) * p->bt2la_count);
 
 	for (node = rb_first(&p->bt2la_map); node; node = rb_next(node)) {
 		struct bt2la *bt2la = rb_entry(node, struct bt2la, rb_node);
+		array[n++] = bt2la;
+	}
+
+	assert(n == p->bt2la_count);
+	qsort(array, n, sizeof(struct bt2la*), sort_func[arg_sort]);
+
+	for (n = 0; n < p->bt2la_count; n++) {
+		struct bt2la *bt2la = array[n];
 		double percentage = (bt2la->la.total*100.0)/p->summarized.total;
 		const char *translation;
 
@@ -74,9 +120,9 @@ void process_dump(struct process *p)
 
 		format_ms(total, 32, bt2la->la.total/1000);
 		format_ms(max,   32, bt2la->la.max/1000);
-		format_ms(avg,  32, bt2la->la.total/bt2la->la.count/1000);
+		format_ms(avg,   32, bt2la->la.total/bt2la->la.count/1000);
 
-		printf(" %-44s %5.1f%% Max:%8s Avg:%8s\n", translation ?: sym_bt, percentage, max, avg);
+		printf("%-44s %5.1f%% Max:%8s Avg:%8s\n", translation ?: sym_bt, percentage, max, avg);
 	}
 }
 
@@ -145,6 +191,7 @@ void process_suffer_latency(struct process *p, uint64_t delay,
 
 	rb_link_node(&item->rb_node, parent, link);
 	rb_insert_color(&item->rb_node, &p->bt2la_map);
+	p->bt2la_count++;
 }
 
 
@@ -159,6 +206,7 @@ struct process *process_new(pid_t pid, pid_t tid, const char comm[16])
 	p->tid = tid;
 	strcpy(p->comm, comm);
 	la_clear(&p->summarized);
+	p->bt2la_count = 0;
 	return p;
 }
 

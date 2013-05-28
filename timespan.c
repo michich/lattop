@@ -16,7 +16,8 @@ char *format_ms(char *buf, size_t l, uint64_t usec)
 		prec = 2;
 	else
 		prec = 3;
-	sprintf(buf, "%*.*f%*s", 4+(prec?:-1), prec, usec / 1000.0, 5-(prec?:-1), "ms");
+	//sprintf(buf, "%*.*f%*s", 4+(prec?:-1), prec, usec / 1000.0, 5-(prec?:-1), "ms");
+	sprintf(buf, "%*.*f%*s", 4+(prec?:-1), prec, usec / 1000.0, 5-(prec?:-1), "  ");
 	return buf;
 }
 
