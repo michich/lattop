@@ -174,21 +174,29 @@ static void usage_and_exit(int code)
 "                                'max'      maximum latency (default)\n"
 "                                'total'    total latency\n"
 "                                'pid'      pid of the process\n"
-"  -r, --reverse                reverse the sort order\n");
+"  -r, --reverse                reverse the sort order\n"
+"  -m, --min-latency=MIN        ignore latencies shorter than MIN microseconds\n"
+"  -M, --max-interruptible=MAX  ignore latencies from interruptible sleeps longer\n"
+"                               than MAX microseconds (default: 5000)\n"
+
+);
 	exit(code);
 }
 
 static void parse_argv(int argc, char *argv[])
 {
+	char *endptr;
 	int c, i, option_index = 0;
 
 	static const struct option long_options[] = {
-		{ "interval", required_argument, 0, 'i' },
-		{ "count",    required_argument, 0, 'c' },
-		{ "reverse",  no_argument,       0, 'r' },
-		{ "sort",     required_argument, 0, 's' },
-		{ "help",     no_argument,       0, 'h' },
-		{ 0,          0,                 0,  0  }
+		{ "interval",          required_argument, 0, 'i' },
+		{ "count",             required_argument, 0, 'c' },
+		{ "sort",              required_argument, 0, 's' },
+		{ "reverse",           no_argument,       0, 'r' },
+		{ "min-latency",       required_argument, 0, 'm' },
+		{ "max-interruptible", required_argument, 0, 'M' },
+		{ "help",              no_argument,       0, 'h' },
+		{ 0,                   0,                 0,  0  }
 	};
 
 	static const char *sort_types[_NR_SORT_BY] = {
@@ -198,7 +206,7 @@ static void parse_argv(int argc, char *argv[])
 	};
 
 	for (;;) {
-		c = getopt_long(argc, argv, "i:c:rs:h", long_options, &option_index);
+		c = getopt_long(argc, argv, "i:c:s:rm:M:h", long_options, &option_index);
 		if (c == -1)
 			break;
 
@@ -233,6 +241,24 @@ static void parse_argv(int argc, char *argv[])
 
 			arg_sort = i;
 
+			break;
+		case 'm':
+			errno = 0;
+			arg_min_delay = strtoull(optarg, &endptr, 10);
+			if (errno || endptr == optarg || *endptr != '\0') {
+				fprintf(stderr, "Invalid delay specification '%s'\n", optarg);
+				exit(1);
+			}
+			arg_min_delay *= NSEC_PER_USEC;
+			break;
+		case 'M':
+			errno = 0;
+			arg_max_interruptible_delay = strtoull(optarg, &endptr, 10);
+			if (errno || endptr == optarg || *endptr != '\0') {
+				fprintf(stderr, "Invalid delay specification '%s'\n", optarg);
+				exit(1);
+			}
+			arg_max_interruptible_delay *= NSEC_PER_USEC;
 			break;
 		case 'h':
 			usage_and_exit(0);
