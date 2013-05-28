@@ -73,7 +73,7 @@ void process_dump(struct process *p)
 {
 	struct rb_node *node;
 	struct bt2la **array;
-	char sym_bt[1000], commpidtid[32], total[32], max[32];
+	char sym_bt[1000], commpidtid[45], total[32], max[32];
 	unsigned n = 0;
 
 	static int (*const sort_func[_NR_SORT_BY])(const void *, const void *) = {
@@ -82,13 +82,13 @@ void process_dump(struct process *p)
 		[SORT_BY_PID]           = compare_by_max_latency, /* sorting by pid makes no sense within a process */
 	};
 
-	format_ms(total, 32, p->summarized.total/1000);
+	format_timespan(total, 32, p->summarized.total/1000, 10);
 	format_ms(max,   32, p->summarized.max/1000);
 
 	if (p->pid != p->tid)
-		sprintf(commpidtid, "%s (%d, thread %d)", p->comm, p->pid, p->tid);
+		snprintf(commpidtid, sizeof(commpidtid), "%s (%d, thread %d)", p->comm, p->pid, p->tid);
 	else
-		sprintf(commpidtid, "%s (%d)", p->comm, p->pid);
+		snprintf(commpidtid, sizeof(commpidtid), "%s (%d)", p->comm, p->pid);
 
 	printf("%-44s Max:%8s Total:%8s\n", commpidtid, max, total);
 
