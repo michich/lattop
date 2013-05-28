@@ -8,21 +8,6 @@
 /* format_timespan() originally copied from systemd,
  *     Copyright 2010 Lennart Poettering */
 
-char *format_ms(char *buf, size_t l, uint64_t usec)
-{
-	int prec;
-	if (usec >= 100*1000)
-		prec = 0;
-	else if (usec >= 10*1000)
-		prec = 1;
-	else if (usec >=  1*1000)
-		prec = 2;
-	else
-		prec = 3;
-	snprintf(buf, l, "%*.*f%*s", 4+(prec?:-1), prec, usec / 1000.0, 5-(prec?:-1), "ms");
-	return buf;
-}
-
 #undef MIN
 #define MIN(a,b)                                \
         __extension__ ({                        \
@@ -32,6 +17,25 @@ char *format_ms(char *buf, size_t l, uint64_t usec)
                 })
 
 #define ELEMENTSOF(x) (sizeof(x)/sizeof((x)[0]))
+
+char *format_ms(char *buf, size_t l, uint64_t usec, unsigned significant_digits)
+{
+	uint64_t tmp;
+	unsigned log;
+	int prec;
+
+	log = 0;
+	tmp = usec / 1000;
+	while (tmp > 0) {
+		tmp /= 10;
+		log++;
+	}
+
+	prec = significant_digits - MIN(log, significant_digits);
+
+	snprintf(buf, l, "%*.*f%*s", 4+(prec?:-1), prec, usec / 1000.0, 5-(prec?:-1), "ms");
+	return buf;
+}
 
 char *format_timespan(char *buf, size_t l, uint64_t t, uint64_t accuracy) {
         static const struct {

@@ -69,6 +69,8 @@ void lattop_reader_started(struct polled_reader *r)
 	readers[num_readers] = timer_reader_new();
 	start_reader(num_readers);
 	num_readers++;
+
+	fprintf(stderr, "Systemtap probe activated. Reading data...\n");
 }
 
 static int main_loop(void)
@@ -138,7 +140,7 @@ static int init(void)
 	assert(num_readers < MAX_READERS);
 	readers[num_readers++] = stap_reader_new();
 
-	printf("Initializing...\n");
+	fprintf(stderr, "Initializing Systemtap probe...\n");
 
 	for (i = 0; i < num_readers; i++) {
 		r = start_reader(i);

@@ -70,7 +70,6 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 			return -1;
 
 		r->state = STAP_RUNNING;
-		printf("Systemtap probe is now active.\n");
 		lattop_reader_started(pr);
 		return 0;
 	}
