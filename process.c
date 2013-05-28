@@ -82,8 +82,8 @@ void process_dump(struct process *p)
 		[SORT_BY_PID]           = compare_by_max_latency, /* sorting by pid makes no sense within a process */
 	};
 
-	format_timespan(total, 32, p->summarized.total/1000, 0);
-	format_ms(max,   32, p->summarized.max/1000, 3);
+	format_timespan(total, 32, p->summarized.total/1000, 3);
+	format_timespan(max,   32, p->summarized.max/1000,   3);
 
 	if (p->pid != p->tid)
 		snprintf(commpidtid, sizeof(commpidtid), "%s (%d, thread %d)", p->comm, p->pid, p->tid);
@@ -118,8 +118,8 @@ void process_dump(struct process *p)
 		}
 
 
-		format_ms(total, 32, bt2la->la.total/1000, 3);
-		format_ms(max,   32, bt2la->la.max/1000, 3);
+		format_timespan(total, 32, bt2la->la.total/1000, 3);
+		format_timespan(max,   32, bt2la->la.max/1000,   3);
 
 		printf(" %-44s Max:%8s %5.1f%%\n", translation ?: sym_bt, max, percentage);
 	}
