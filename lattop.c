@@ -9,8 +9,11 @@
 #include <poll.h>
 #include <sched.h>
 #include <string.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "lattop.h"
 
 #include "process_accountant.h"
 #include "sym_translator.h"
@@ -22,8 +25,10 @@
 
 #define MAX_READERS 2
 
-static int arg_interval = 5;
-static int arg_count;
+int arg_interval = 5;
+int arg_count;
+enum sort_by arg_sort;
+bool arg_reverse;
 
 static struct polled_reader *readers[MAX_READERS];
 static struct pollfd poll_fds[MAX_READERS];
@@ -61,7 +66,7 @@ void lattop_reader_started(struct polled_reader *r)
 	assert(num_readers == 1);
 	assert(num_readers < MAX_READERS);
 
-	readers[num_readers] = timer_reader_new(arg_interval, arg_count);
+	readers[num_readers] = timer_reader_new();
 	start_reader(num_readers);
 	num_readers++;
 }
@@ -133,7 +138,7 @@ static int init(void)
 	assert(num_readers < MAX_READERS);
 	readers[num_readers++] = stap_reader_new();
 
-	printf("Starting...\n");
+	printf("Initializing...\n");
 
 	for (i = 0; i < num_readers; i++) {
 		r = start_reader(i);
@@ -162,26 +167,59 @@ static void usage_and_exit(int code)
 
 static void parse_argv(int argc, char *argv[])
 {
-	int c, option_index = 0;
+	int c, i, option_index = 0;
+
+	static const struct option long_options[] = {
+		{ "interval", required_argument, 0, 'i' },
+		{ "count",    required_argument, 0, 'c' },
+		{ "reverse",  no_argument,       0, 'r' },
+		{ "sort",     required_argument, 0, 's' },
+		{ "help",     no_argument,       0, 'h' },
+		{ 0,          0,                 0,  0  }
+	};
+
+	static const char *sort_types[_NR_SORT_BY] = {
+		[SORT_BY_MAX_LATENCY]   = "max",
+		[SORT_BY_TOTAL_LATENCY] = "total",
+		[SORT_BY_PID]           = "pid",
+	};
 
 	for (;;) {
-		static const struct option long_options[] = {
-			{ "interval", required_argument, 0, 'i' },
-			{ "count",    required_argument, 0, 'c' },
-			{ "help",     no_argument,       0, 'h' },
-			{ 0,          0,                 0,  0  }
-		};
-
-		c = getopt_long(argc, argv, "i:c:h", long_options, &option_index);
+		c = getopt_long(argc, argv, "i:c:rs:h", long_options, &option_index);
 		if (c == -1)
 			break;
 
 		switch (c) {
 		case 'i':
 			arg_interval = atoi(optarg);
+			if (arg_interval <= 0) {
+				fprintf(stderr, "Interval must be a positive number.\n");
+				exit(1);
+			}
 			break;
 		case 'c':
 			arg_count = atoi(optarg);
+			if (arg_interval < 0) {
+				fprintf(stderr, "Count must be positive (or zero for infinite).\n");
+				exit(1);
+			}
+			break;
+		case 'r':
+			arg_reverse = true;
+			break;
+		case 's':
+			for (i = 0; i < _NR_SORT_BY; i++) {
+				if (!strcasecmp(optarg, sort_types[i]))
+					break;
+			}
+
+			if (i == _NR_SORT_BY) {
+				fprintf(stderr, "Unknown sort type '%s'.\n", optarg);
+				exit(1);
+			}
+
+			arg_sort = i;
+
 			break;
 		case 'h':
 			usage_and_exit(0);

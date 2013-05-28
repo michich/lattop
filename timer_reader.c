@@ -14,6 +14,7 @@
 
 #include "timer_reader.h"
 
+#include "lattop.h"
 #include "process_accountant.h"
 
 struct timer_reader {
@@ -30,8 +31,8 @@ static int timer_reader_start(struct polled_reader *pr)
 {
 	struct timer_reader *tr = (struct timer_reader*) pr;
 	const struct itimerspec its = {
-		.it_interval = { tr->interval, 0 },
-		.it_value =    { tr->interval, 0 },
+		.it_interval = { arg_interval, 0 },
+		.it_value =    { arg_interval, 0 },
 	};
 	int r;
 
@@ -91,7 +92,7 @@ static const struct polled_reader_ops timer_reader_ops = {
 	.handle_ready_fd = timer_reader_handle_ready_fd,
 };
 
-struct polled_reader *timer_reader_new(int interval, int count)
+struct polled_reader *timer_reader_new()
 {
 	struct timer_reader *r;
 
@@ -101,8 +102,7 @@ struct polled_reader *timer_reader_new(int interval, int count)
 
 	r->pr.ops = &timer_reader_ops;
 
-	r->interval = interval;
-	r->count = count;
+	r->count = arg_count;
 
 	return &r->pr;
 }

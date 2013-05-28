@@ -9,6 +9,6 @@
 
 #include "polled_reader.h"
 
-struct polled_reader *timer_reader_new(int interval, int count);
+struct polled_reader *timer_reader_new();
 
 #endif
