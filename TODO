@@ -1,3 +1,0 @@
-- 32-bit lattop does not work on 64-bit kernel. Should it?
-- Test scalability, lots of CPUs. Go for per-CPU perf readers if necessary.
-- integrate with original latencytop
