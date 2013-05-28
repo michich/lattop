@@ -54,7 +54,7 @@ void process_dump(struct process *p)
 	else
 		sprintf(commpidtid, "%s (%d)", p->comm, p->pid);
 
-	printf("%-40s Total: %s\n", commpidtid, total);
+	printf("%-40s Max:%8s Total: %8s\n", commpidtid, max, total);
 
 	for (node = rb_first(&p->bt2la_map); node; node = rb_next(node)) {
 		struct bt2la *bt2la = rb_entry(node, struct bt2la, rb_node);

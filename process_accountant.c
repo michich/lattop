@@ -3,6 +3,7 @@
  * Author: Michal Schmidt
  * License: GPLv2
  */
+#include <assert.h>
 #include <stdio.h>
 
 #include "process_accountant.h"
@@ -10,11 +11,8 @@
 #include "process.h"
 #include "rbtree.h"
 
-struct process_accountant {
-	struct rb_root processes;
-};
-
-struct process_accountant accountant;
+static struct rb_root processes;
+static unsigned count;
 
 static void pa_delete_rbtree(struct rb_node *n)
 {
@@ -30,18 +28,46 @@ static void pa_delete_rbtree(struct rb_node *n)
 
 void pa_clear(void)
 {
-	pa_delete_rbtree(accountant.processes.rb_node);
-	accountant.processes = RB_ROOT;
+	pa_delete_rbtree(processes.rb_node);
+	processes = RB_ROOT;
+	count = 0;
+}
+
+static int compare_by_latency(const void *p1, const void *p2)
+{
+	struct process *pr1 = *(struct process**)p1;
+	struct process *pr2 = *(struct process**)p2;
+
+	if (pr1->summarized.max < pr2->summarized.max)
+		return 1;
+	else if (pr1->summarized.max > pr2->summarized.max)
+		return -1;
+	else
+		return 0;
 }
 
 void pa_dump_and_clear(void)
 {
 	struct rb_node *node;
-	struct process *process;
-	for (node = rb_first(&accountant.processes); node; node = rb_next(node)) {
+	struct process *process, **array;
+	unsigned n = 0;
+
+	array = alloca(sizeof(struct process*) * count);
+
+	/* summarize processes */
+	for (node = rb_first(&processes); node; node = rb_next(node)) {
 		process = rb_entry(node, struct process, rb_node);
 		process_summarize(process);
-		process_dump(process);
+		array[n++] = process;
+	}
+
+	/* sort by latency */
+	assert(n == count);
+	qsort(array, count, sizeof(struct process*), compare_by_latency);
+
+	/* dump processes */
+	for (n = 0; n < count; n++) {
+		process_dump(array[n]);
 		printf("\n");
 	}
 	printf("-\n");
@@ -52,7 +78,7 @@ void pa_dump_and_clear(void)
 static struct process *search_process(pid_t tid, struct rb_node **pparent,
 				      struct rb_node ***plink)
 {
-	struct rb_node **p = &accountant.processes.rb_node;
+	struct rb_node **p = &processes.rb_node;
 	struct rb_node *parent = NULL;
 	struct process *process;
 
@@ -85,7 +111,8 @@ void pa_account_latency(pid_t pid, pid_t tid, const char comm[16], uint64_t dela
 	if (!process) {
 		process = process_new(pid, tid, comm);
 		rb_link_node(&process->rb_node, parent, link);
-		rb_insert_color(&process->rb_node, &accountant.processes);
+		rb_insert_color(&process->rb_node, &processes);
+		count++;
 	}
 	process_suffer_latency(process, delay, bt);
 }
@@ -93,7 +120,7 @@ void pa_account_latency(pid_t pid, pid_t tid, const char comm[16], uint64_t dela
 
 void pa_init(void)
 {
-	accountant.processes = RB_ROOT;
+	processes = RB_ROOT;
 }
 
 void pa_fini(void)
