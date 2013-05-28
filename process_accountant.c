@@ -9,6 +9,7 @@
 
 #include "process_accountant.h"
 
+#include "lattop.h"
 #include "process.h"
 #include "rbtree.h"
 
@@ -34,7 +35,7 @@ void pa_clear(void)
 	count = 0;
 }
 
-static int compare_by_latency(const void *p1, const void *p2)
+static int compare_by_max_latency(const void *p1, const void *p2)
 {
 	struct process *pr1 = *(struct process**)p1;
 	struct process *pr2 = *(struct process**)p2;
@@ -47,12 +48,48 @@ static int compare_by_latency(const void *p1, const void *p2)
 		return 0;
 }
 
+static int compare_by_total_latency(const void *p1, const void *p2)
+{
+	struct process *pr1 = *(struct process**)p1;
+	struct process *pr2 = *(struct process**)p2;
+
+	if (pr1->summarized.total < pr2->summarized.total)
+		return 1;
+	else if (pr1->summarized.total > pr2->summarized.total)
+		return -1;
+	else
+		return 0;
+}
+
+static int compare_by_pid(const void *p1, const void *p2)
+{
+	struct process *pr1 = *(struct process**)p1;
+	struct process *pr2 = *(struct process**)p2;
+
+	if (pr1->pid < pr2->pid)
+		return -1;
+	else if (pr1->pid > pr2->pid)
+		return 1;
+	else if (pr1->tid < pr2->tid)
+		return -1;
+	else if (pr1->tid > pr2->tid)
+		return 1;
+	else
+		return 0;
+}
+
 void pa_dump_and_clear(void)
 {
 	struct rb_node *node;
 	struct process *process, **array;
 	time_t cur_time;
 	unsigned n = 0;
+
+	static int (*const sort_func[_NR_SORT_BY])(const void *, const void *) = {
+		[SORT_BY_MAX_LATENCY]   = compare_by_max_latency,
+		[SORT_BY_TOTAL_LATENCY] = compare_by_total_latency,
+		[SORT_BY_PID]           = compare_by_pid,
+	};
 
 	time(&cur_time);
 
@@ -65,14 +102,18 @@ void pa_dump_and_clear(void)
 		array[n++] = process;
 	}
 
-	/* sort by latency */
+	/* sort by whatever key */
 	assert(n == count);
-	qsort(array, count, sizeof(struct process*), compare_by_latency);
+	qsort(array, count, sizeof(struct process*), sort_func[arg_sort]);
 
 	/* dump processes */
 	putchar('\n');
-	for (n = 0; n < count; n++)
-		process_dump(array[n]);
+	if (!arg_reverse)
+		for (n = 0; n < count; n++)
+			process_dump(array[n]);
+	else
+		for (n = count; n > 0; n--)
+			process_dump(array[n-1]);
 	printf("=== %s", ctime(&cur_time));
 
 	pa_clear();
