@@ -1,12 +1,15 @@
 #include <assert.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "timespan.h"
 
-/* format_timespan() originally copied from systemd,
- *     Copyright 2010 Lennart Poettering */
+/* Originally format_timespan() was copied from systemd,
+ *     Copyright 2010 Lennart Poettering
+ *     (LGPLv2)
+ * but the implementation has been replaced by much simplified and dumber code,
+ * which produces different formatting more suited for lattop's needs.
+ */
 
 #undef MIN
 #define MIN(a,b)                                \
