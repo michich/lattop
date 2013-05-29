@@ -6,9 +6,13 @@
  * License: GPLv2
  */
 
+#include <sys/uio.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,89 +29,272 @@ struct stap_reader {
 	/* must be first */
 	struct polled_reader pr;
 
-	FILE *stap_popen;
-	enum { STAP_STARTING, STAP_RUNNING } state;
+	int pipe[2];
+	pid_t stap_pid;
 
+	enum { STAP_STARTING, STAP_WANT_PROC_INFO, STAP_WANT_LATENCY } state;
+
+	/* currently processed line of input */
 	char *line;
 	size_t len;
+
+	/* ring buffer for reading input pipe */
+	char buf[64*1024];
+	unsigned start, fill_count;
+
+	/* data read in state STAP_WANT_PROC_INFO */
+	char comm[16]; /* TASK_COMM_LEN */
+	unsigned long delay;
+	unsigned long pid;
+	unsigned long tid;
+	char sleep_or_block;
 };
 
 static int stap_reader_start(struct polled_reader *pr)
 {
 	struct stap_reader *sr = (struct stap_reader*) pr;
-	char *cmd;
+	pid_t pid;
 	int r;
 
-	/* XXX avoid popen, use manual pipe,fork,exec */
-	r = asprintf(&cmd, "stap -g lat.stp %llu %llu %llu", arg_min_delay, arg_max_interruptible_delay, arg_pid_filter);
+	r = pipe2(sr->pipe, 0);
 	if (r < 0) {
 		r = -errno;
-		perror("asprintf");
-		return r;
+		perror("pipe");
+		goto out_pipe;
 	}
-	sr->stap_popen = popen(cmd, "re");
-	free(cmd);
 
-	return sr->stap_popen ? 0 : -errno;
+	pid = fork();
+	if (pid < 0) {
+		r = -errno;
+		perror("fork");
+		goto out_fork;
+	}
+
+	if (pid == 0) {
+		/* child */
+		char *argv[7];
+		unsigned n;
+
+		close(sr->pipe[0]);
+		r = dup2(sr->pipe[1], STDOUT_FILENO);
+		if (r < 0) {
+			perror("dup2");
+			exit(1);
+		}
+
+		n = 0;
+		argv[n++] = "stap";
+		argv[n++] = "-g";
+		argv[n++] = "lat.stp";
+		asprintf(&argv[n++], "%llu", arg_min_delay);
+		asprintf(&argv[n++], "%llu", arg_max_interruptible_delay);
+		asprintf(&argv[n++], "%llu", arg_pid_filter);
+		argv[n++] = NULL;
+
+		execvp("stap", argv);
+
+		/* only on failure */
+		perror("Executing stap");
+		exit(1);
+	}
+
+	/* parent */
+	sr->stap_pid = pid;
+	close(sr->pipe[1]);
+	fcntl(sr->pipe[0], F_SETFL,
+	      fcntl(sr->pipe[0], F_GETFL, 0) | O_NONBLOCK);
+
+	return 0;
+
+out_fork:
+	close(sr->pipe[0]);
+	close(sr->pipe[1]);
+out_pipe:
+	return r;
+}
+
+static ssize_t buf_refill(struct stap_reader *sr)
+{
+	struct iovec iovecs[2];
+	int iovcnt;
+	ssize_t nread;
+
+	unsigned space = sizeof(sr->buf) - sr->fill_count;
+	if (!space)
+		return -ENOSPC;
+
+	unsigned first_empty_idx = (sr->start + sr->fill_count) % sizeof(sr->buf);
+	char *first_empty = sr->buf + first_empty_idx;
+
+	if (space <= sizeof(sr->buf) - first_empty_idx) {
+		/* no wrap */
+		iovecs[0].iov_base = first_empty;
+		iovecs[0].iov_len = space;
+		iovcnt = 1;
+	} else {
+		/* wrap */
+		iovecs[0].iov_base = first_empty;
+		iovecs[0].iov_len = sizeof(sr->buf) - first_empty_idx;
+		iovecs[1].iov_base = sr->buf;
+		iovecs[1].iov_len = space - iovecs[0].iov_len;
+		iovcnt = 2;
+	}
+
+	nread = readv(sr->pipe[0], iovecs, iovcnt);
+	if (nread < 0)
+		return -errno;
+
+	sr->fill_count += nread;
+
+	return nread;
+}
+
+static char *bufchr(struct stap_reader *sr, char c)
+{
+	char *p;
+	unsigned first_part_len = sizeof(sr->buf) - sr->start;
+
+	if (sr->fill_count <= first_part_len)
+		/* no wrap */
+		return memchr(sr->buf + sr->start, c, sr->fill_count);
+	else {
+		/* wrap */
+		p = memchr(sr->buf + sr->start, c, first_part_len);
+		if (p)
+			return p;
+		return memchr(sr->buf, c, sr->fill_count - first_part_len);
+	}
+}
+
+static ssize_t get_next_line(struct stap_reader *sr)
+{
+	char *start = sr->buf + sr->start;
+	char *eol, *p;
+	unsigned line_len; /* including the \n, NOT including \0 */
+
+	eol = bufchr(sr, '\n');
+	if (!eol)
+		return -ENOENT;
+
+	line_len = eol - start + 1;
+	if (eol < start)  /* wrap */
+		line_len += sizeof(sr->buf);
+
+	if (sr->len <= line_len) {
+		char *reallocd_line;
+		reallocd_line = realloc(sr->line, line_len + 1);
+		if (!reallocd_line)
+			return -ENOMEM;
+		sr->line = reallocd_line;
+		sr->len  = line_len + 1;
+	}
+
+	if (eol >= start) {
+		/* no wrap */
+		p = mempcpy(sr->line, start, line_len);
+		*p = '\0';
+	} else {
+		/* wrap */
+		unsigned first_part_len = sizeof(sr->buf) - sr->start;
+		p = mempcpy(sr->line, start, first_part_len);
+		p = mempcpy(p, sr->buf, line_len - first_part_len);
+		*p = '\0';
+	}
+
+	/* consume the line */
+	sr->start = eol - sr->buf + 1;
+	if (sr->start == sizeof(sr->buf))
+		sr->start = 0;
+	sr->fill_count -= line_len;
+
+	return line_len;
+}
+
+static int read_all_lines(struct stap_reader *sr)
+{
+	ssize_t n;
+	char *str;
+	struct back_trace bt;
+	int depth;
+	int nread;
+	bool end_of_trace;
+
+	for (;;) {
+		n = get_next_line(sr);
+		if (n < 0) {
+			if (n == -ENOENT)
+				/* no complete line, must read more */
+				return 0;
+			return n;
+		}
+
+		switch (sr->state) {
+		case STAP_STARTING:
+			if (strcmp(sr->line, "lat begin\n"))
+				return -EINVAL;
+
+			lattop_reader_started(&sr->pr);
+			sr->state = STAP_WANT_PROC_INFO;
+			break;
+
+		case STAP_WANT_PROC_INFO:
+			if (sscanf(sr->line, "%c %lu %lu %lu %15[^\n]", &sr->sleep_or_block, &sr->delay, &sr->pid, &sr->tid, sr->comm) != 5) {
+				fprintf(stderr, "Malformed input line.\n");
+				return -EINVAL;
+			}
+			sr->state = STAP_WANT_LATENCY;
+			break;
+
+		case STAP_WANT_LATENCY:
+			str = sr->line;
+			end_of_trace = false;
+			for (depth = 0; depth < MAX_BT_LEN; depth++) {
+				if (end_of_trace) {
+					bt.trace[depth] = 0;
+					continue;
+				}
+
+				if (sscanf(str, "%lx%n", &bt.trace[depth], &nread) == 1)
+					str += nread;
+				else {
+					bt.trace[depth] = 0;
+					end_of_trace = true;
+				}
+			}
+
+			pa_account_latency(sr->pid, sr->tid, sr->comm, sr->delay, &bt);
+			sr->state = STAP_WANT_PROC_INFO;
+			break;
+		}
+	}
 }
 
 static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 {
-	struct stap_reader *r = (struct stap_reader*) pr;
-	ssize_t n;
-	char *str;
-	char comm[16]; /* TASK_COMM_LEN */
-	unsigned long delay;
-	unsigned long pid;
-	unsigned long tid;
-	struct back_trace bt;
-	int depth;
-	int nread;
-	char sleep_or_block;
-	bool end_of_trace;
+	struct stap_reader *sr = (struct stap_reader*) pr;
+	ssize_t refill_result;
+	int r, i;
 
-	/* XXX I don't think getline (buffered) mixes well with poll().
-         * Should use a non-blocking fd and read everything there is to read. */
-
-	/* 1st line - task info */
-	n = getline(&r->line, &r->len, r->stap_popen);
-	if (n <= 0)
-		return -1;
-
-	if (r->state == STAP_STARTING) {
-		if (strcmp(r->line, "lat begin\n"))
+	/* Finite loop count in order to give other polled readers a chance */
+	for (i = 0; i < 100; i++) {
+		refill_result = buf_refill(sr);
+		switch (refill_result) {
+		case 0:
 			return -1;
-
-		r->state = STAP_RUNNING;
-		lattop_reader_started(pr);
-		return 0;
-	}
-
-	if (sscanf(r->line, "%c %lu %lu %lu %15[^\n]", &sleep_or_block, &delay, &pid, &tid, comm) != 5)
-		return -1;
-
-	/* 2nd line - stack trace */
-	n = getline(&r->line, &r->len, r->stap_popen);
-	if (n <= 0)
-		return -1;
-
-	str = r->line;
-	end_of_trace = false;
-	for (depth = 0; depth < MAX_BT_LEN; depth++) {
-		if (end_of_trace) {
-			bt.trace[depth] = 0;
-			continue;
+		case -EAGAIN:
+			return 0;
+		case -ENOSPC:
+			fprintf(stderr, "No space in read buffer before refilling. Weird.\n");
+			/* try to recover by dropping it all */
+			sr->fill_count = 0;
+			return 0;
+		default:;
 		}
 
-		if (sscanf(str, "%lx%n", &bt.trace[depth], &nread) == 1)
-			str += nread;
-		else {
-			bt.trace[depth] = 0;
-			end_of_trace = true;
-		}
+		r = read_all_lines(sr);
+		if (r < 0)
+			return r;
 	}
-
-	pa_account_latency(pid, tid, comm, delay, &bt);
 
 	return 0;
 }
@@ -115,15 +302,28 @@ static int stap_reader_handle_ready_fd(struct polled_reader *pr)
 static void stap_reader_fini(struct polled_reader *pr)
 {
 	struct stap_reader *sr = (struct stap_reader*) pr;
-	if (sr->stap_popen)
-		pclose(sr->stap_popen);
+	if (sr->stap_pid) {
+		int r, status;
+
+		close(sr->pipe[0]);
+		kill(sr->stap_pid, SIGTERM);
+		kill(sr->stap_pid, SIGCONT);
+
+		do {
+			r = waitpid(sr->stap_pid, &status, 0);
+			if (r < 0 && errno != EINTR) {
+				perror("waitpid");
+				break;
+			}
+		} while (!WIFEXITED(status) && !WIFSIGNALED(status));
+	}
 	free(sr->line);
 }
 
 static int stap_reader_get_fd(struct polled_reader *pr)
 {
-	struct stap_reader *r = (struct stap_reader*) pr;
-	return fileno(r->stap_popen);
+	struct stap_reader *sr = (struct stap_reader*) pr;
+	return sr->pipe[0];
 }
 
 static const struct polled_reader_ops stap_reader_ops = {
