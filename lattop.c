@@ -21,10 +21,11 @@
 
 #include "polled_reader.h"
 #include "timer_reader.h"
+#include "signal_reader.h"
 #include "stap_reader.h"
 #include "timespan.h"
 
-#define MAX_READERS 2
+#define MAX_READERS 3
 
 int arg_interval = 5;
 int arg_count;
@@ -67,7 +68,6 @@ void lattop_reader_started(struct polled_reader *r)
 {
 	/* stap reader */
 	assert(readers[0] == r);
-	assert(num_readers == 1);
 	assert(num_readers < MAX_READERS);
 
 	readers[num_readers] = timer_reader_new();
@@ -141,8 +141,9 @@ static int init(void)
 
 	pa_init();
 
-	assert(num_readers < MAX_READERS);
 	readers[num_readers++] = stap_reader_new();
+	readers[num_readers++] = signal_reader_new();
+	assert(num_readers <= MAX_READERS);
 
 	fprintf(stderr, "Initializing Systemtap probe...\n");
 
