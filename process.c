@@ -73,7 +73,7 @@ void process_dump(struct process *p)
 {
 	struct rb_node *node;
 	struct bt2la **array;
-	char sym_bt[1000], commpidtid[45], total[32], max[32];
+	char sym_bt[1000], commpidtid[52], total[32], max[32];
 	unsigned n = 0;
 
 	static int (*const sort_func[_NR_SORT_BY])(const void *, const void *) = {
@@ -90,7 +90,7 @@ void process_dump(struct process *p)
 	else
 		snprintf(commpidtid, sizeof(commpidtid), "%s (%d)", p->comm, p->pid);
 
-	printf("%-44s Max:%8s Total:%8s\n", commpidtid, max, total);
+	printf("%-51s Max:%8s Total:%8s\n", commpidtid, max, total);
 
 	array = alloca(sizeof(struct bt2la*) * p->bt2la_count);
 
@@ -110,7 +110,7 @@ void process_dump(struct process *p)
 		bt_save_symbolic(&bt2la->bt, sym_bt+1, sizeof(sym_bt)-1);
 		translation = lat_translator_translate_stack(sym_bt+1);
 		if (!translation) {
-			size_t end = strnlen(sym_bt+1, 42);
+			size_t end = strnlen(sym_bt+1, 49);
 			sym_bt[0] = '[';
 			/* this is safe, because sym_bt array is way larger than our strnlen limit above */
 			sym_bt[end+1] = ']';
@@ -121,7 +121,7 @@ void process_dump(struct process *p)
 		format_timespan(total, 32, bt2la->la.total/1000, 3);
 		format_timespan(max,   32, bt2la->la.max/1000,   3);
 
-		printf(" %-44s Max:%8s %5.1f%%\n", translation ?: sym_bt, max, percentage);
+		printf(" %-51s Max:%8s %5.1f%%\n", translation ?: sym_bt, max, percentage);
 	}
 }
 
