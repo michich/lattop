@@ -21,10 +21,6 @@
 #include "process_accountant.h"
 #include "lattop.h"
 
-#define ELEMENTSOF(x) (sizeof(x)/sizeof((x)[0]))
-
-static const char stp_template[] = "/tmp/lattop-XXXXXX.stp";
-
 struct stap_reader {
 	/* must be first */
 	struct polled_reader pr;
@@ -34,148 +30,25 @@ struct stap_reader {
 
 	char *line;
 	size_t len;
-	
-	char stp_filename[sizeof(stp_template)];
 };
-
-static const struct {
-	const char *pattern;
-	size_t pattern_len;
-	unsigned long long *pvar;
-} subst_table[] = {
-	{ "@MIN_DELAY@",               sizeof("@MIN_DELAY@")-1,               &arg_min_delay },
-	{ "@MAX_INTERRUPTIBLE_DELAY@", sizeof("@MAX_INTERRUPTIBLE_DELAY@")-1, &arg_max_interruptible_delay },
-	{ "@PID_FILTER@",              sizeof("@PID_FILTER@")-1,              &arg_pid_filter },
-};
-
-static int substitute(char buf[], size_t size, size_t *plen)
-{
-	char *p, *atsign;
-	size_t rem = *plen;
-	int i;
-
-	p = buf;
-	atsign = memchr(p, '@', rem);
-
-	while (atsign) {
-		/* skip over non-interesting source */
-		rem -= atsign - p;
-		p = atsign;
-
-		assert(rem >= 0);
-
-		/* look for known patterns */
-		for (i = 0; i < ELEMENTSOF(subst_table); i++) {
-			if (subst_table[i].pattern_len > rem)
-				continue;
-
-			if (!memcmp(p, subst_table[i].pattern, subst_table[i].pattern_len))
-				break;
-		}
-
-		/* found a match? */
-		if (i < ELEMENTSOF(subst_table)) {
-			char number[32];
-			size_t number_len;
-			number_len = sprintf(number, "%llu", *subst_table[i].pvar);
-
-			/* substitution may enlarge the result by too much */
-			if (p + rem + number_len - subst_table[i].pattern_len > buf + size)
-				return -EFBIG;
-
-			/* do the actual substitution */
-			memmove(p + number_len, p + subst_table[i].pattern_len, rem - subst_table[i].pattern_len);
-			p = mempcpy(p, number, number_len);
-			rem -= subst_table[i].pattern_len;
-			*plen += number_len - subst_table[i].pattern_len;
-		} else {
-			p++;
-			rem--;
-		}
-
-		assert(rem >= 0);
-
-		atsign = memchr(p, '@', rem);
-	}
-
-	return 0;
-}
-
-static int fill_in(struct stap_reader *sr, int fd, const char *source_filename)
-{
-	char buf[64*1024]; /* big enough to read and process the complete stp script */
-	ssize_t rlen, wlen;
-	size_t len;
-	int source_fd;
-	int r;
-
-	source_fd = open(source_filename, O_RDONLY|O_CLOEXEC);
-	if (source_fd < 0) {
-		r = -errno;
-		fprintf(stderr, "Opening %s: %m\n", source_filename);
-		return r;
-	}
-
-	rlen = read(source_fd, buf, sizeof(buf));
-	if (rlen < 0) {
-		r = -errno;
-		fprintf(stderr, "Reading from '%s': %m\n", source_filename);
-		close(source_fd);
-		return r;
-	}
-	len = rlen;
-	if (len == sizeof(buf)) {
-		fprintf(stderr, "File '%s' is too big", source_filename);
-		close(source_fd);
-		return -EFBIG;
-	}
-
-	close(source_fd);
-
-	r = substitute(buf, sizeof(buf), &len);
-	if (r < 0)
-		return r;
-
-	wlen = write(fd, buf, len);
-	if (wlen < 0) {
-		r = -errno;
-		fprintf(stderr, "Writing to '%s': %m\n", sr->stp_filename);
-		return r;
-	}
-	if (wlen != len) {
-		fprintf(stderr, "Short write to '%s'\n", sr->stp_filename);
-		return -EIO;
-	}
-	return 0;
-}
 
 static int stap_reader_start(struct polled_reader *pr)
 {
-#define CMD "stap -g "
-	char cmd[sizeof(CMD)-1 + sizeof(stp_template)];
 	struct stap_reader *sr = (struct stap_reader*) pr;
-	int fd, r;
-
-	memcpy(sr->stp_filename, stp_template, sizeof(sr->stp_filename));
-	fd = mkstemps(sr->stp_filename, 4);
-	if (fd < 0) {
-		r = -errno;
-		perror("Creating a temp file");
-		return r;
-	}
-
-	r = fill_in(sr, fd, "lat.stp.in");
-	close(fd);
-	if (r < 0)
-		return r;
+	char *cmd;
+	int r;
 
 	/* XXX avoid popen, use manual pipe,fork,exec */
-	memcpy(cmd, CMD, sizeof(CMD)-1);
-	memcpy(cmd + sizeof(CMD)-1, sr->stp_filename, sizeof(stp_template));
+	r = asprintf(&cmd, "stap -g lat.stp %llu %llu %llu", arg_min_delay, arg_max_interruptible_delay, arg_pid_filter);
+	if (r < 0) {
+		r = -errno;
+		perror("asprintf");
+		return r;
+	}
 	sr->stap_popen = popen(cmd, "re");
+	free(cmd);
 
 	return sr->stap_popen ? 0 : -errno;
-#undef CMD
 }
 
 static int stap_reader_handle_ready_fd(struct polled_reader *pr)
@@ -244,7 +117,6 @@ static void stap_reader_fini(struct polled_reader *pr)
 	struct stap_reader *sr = (struct stap_reader*) pr;
 	if (sr->stap_popen)
 		pclose(sr->stap_popen);
-	unlink(sr->stp_filename);
 	free(sr->line);
 }
 

@@ -8,6 +8,11 @@
 
 %}
 
+%( $# != 3 %? **ERROR** %)
+global min_delay = $1
+global max_interruptible_delay = $2
+global pid_filter = $3
+
 function task_stack_trace:string(tsk:long) %{
 	struct stack_trace trace;
 	unsigned long backtrace[LT_BACKTRACEDEPTH];
@@ -42,9 +47,11 @@ probe kernel.trace("sched_stat_sleep") {
 	/* Long interruptible waits are generally user-requested */
 	/* Negative sleeps are time going backwards */
 	/* Zero-time sleeps are non-interesting */
-	if ($delay > 0 && $delay <= 5000000) {
+	pid = task_pid($tsk);
+	if ((pid_filter == 0 || pid_filter == pid) &&
+	    $delay > min_delay && $delay <= max_interruptible_delay) {
 		printf("S %lu %lu %lu %s\n%s\n",
-		       $delay, task_pid($tsk), task_tid($tsk), task_execname($tsk),
+		       $delay, pid, task_tid($tsk), task_execname($tsk),
 		       task_stack_trace($tsk));
 	}
 }
@@ -52,9 +59,11 @@ probe kernel.trace("sched_stat_sleep") {
 probe kernel.trace("sched_stat_blocked") {
 	/* Negative sleeps are time going backwards */
 	/* Zero-time sleeps are non-interesting */
-	if ($delay > 0) {
+	pid = task_pid($tsk);
+	if ((pid_filter == 0 || pid_filter == pid) &&
+	    $delay > min_delay) {
 		printf("B %lu %lu %lu %s\n%s\n",
-		       $delay, task_pid($tsk), task_tid($tsk), task_execname($tsk),
+		       $delay, pid, task_tid($tsk), task_execname($tsk),
 		       task_stack_trace($tsk));
 	}
 }
