@@ -25,7 +25,7 @@ struct symbol_slab {
 	unsigned long fill_count;
 	struct symbol symbols[];
 };
-#define SLAB_SIZE (128*1024)
+#define SLAB_SIZE (1024*1024)
 #define SYMBOLS_PER_SLAB ((SLAB_SIZE - sizeof(struct symbol_slab)) / sizeof(struct symbol))
 
 static struct symbol_slab *first_slab, *current_slab;
