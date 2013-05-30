@@ -3,12 +3,14 @@
  * Author: Michal Schmidt
  * License: GPLv2
  */
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "rbtree.h"
 #include "sym_translator.h"
 
@@ -30,10 +32,12 @@ static struct symbol_slab *first_slab, *current_slab;
 
 /* tree of symbols, only used during kallsyms parsing */
 static struct rb_root addr2fun = RB_ROOT;
-/* after parsing, two simple arrays suffice */
+
 static unsigned long *addr_array;  /* sorted for binary search */
-static char **name_array;
+static char **name_array; /* pointers into all_names */
+static char *all_names;   /* storage for all names: "name\0second_name\0third_name\0..." */
 static unsigned n_symbols;
+static size_t total_name_len;
 
 static struct symbol *__insert_symbol(unsigned long addr, struct symbol *s)
 {
@@ -71,6 +75,7 @@ static struct symbol *insert_symbol(unsigned long addr, struct symbol *s)
 	}
 	rb_insert_color(&s->rb_node, &addr2fun);
 	n_symbols++;
+	total_name_len += strlen(s->name) + 1;
 out:
 	return ret;
 }
@@ -80,7 +85,7 @@ static void delete_names_from_tree(struct rb_node *n)
 	struct symbol *s;
 
 	/* only delete names here if the array hasn't taken ownership of them yet */
-	if (!n || name_array)
+	if (!n || all_names)
 		return;
 	delete_names_from_tree(n->rb_left);
 	delete_names_from_tree(n->rb_right);
@@ -95,7 +100,7 @@ static void delete_slabs(void)
 
 	for (ss = first_slab; ss; ss = next) {
 		next = ss->next;
-		free(ss);
+		munmap(ss, SLAB_SIZE);
 	}
 
 	current_slab = first_slab = NULL;
@@ -105,8 +110,8 @@ static struct symbol_slab *new_slab(void)
 {
 	struct symbol_slab *ss;
 
-	ss = malloc(SLAB_SIZE);
-	if (!ss)
+	ss = mmap(NULL, SLAB_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (ss == MAP_FAILED)
 		return NULL;
 	ss->fill_count = 0;
 	ss->next = NULL;
@@ -182,57 +187,79 @@ out:
 	return r;
 }
 
+static void delete_arrays(void)
+{
+	if (all_names) {
+		munmap(all_names, total_name_len);
+		all_names = NULL;
+	}
+
+	if (name_array) {
+		munmap(name_array, n_symbols * sizeof(char*));
+		name_array = NULL;
+	}
+
+	if (addr_array) {
+		munmap(addr_array, n_symbols * sizeof(unsigned long));
+		addr_array = NULL;
+	}
+}
+
 static int build_arrays(void)
 {
 	struct rb_node *node;
+	char *p;
 	unsigned i;
 
-	addr_array = malloc(n_symbols * sizeof(unsigned long));
-	if (!addr_array)
-		return -ENOMEM;
-
-	name_array = malloc(n_symbols * sizeof(char*));
-	if (!name_array) {
-		free(addr_array);
+	addr_array = mmap(NULL, n_symbols * sizeof(unsigned long), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (addr_array == MAP_FAILED) {
 		addr_array = NULL;
-		return -ENOMEM;
+		goto oom;
+	}
+
+	name_array = mmap(NULL, n_symbols * sizeof(char*), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (name_array == MAP_FAILED) {
+		name_array = NULL;
+		goto oom;
+	}
+
+	all_names = mmap(NULL, total_name_len, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (all_names == MAP_FAILED) {
+		all_names = NULL;
+		goto oom;
 	}
 
 	i = 0;
+	p = all_names;
 	for (node = rb_first(&addr2fun); node; node = rb_next(node)) {
 		struct symbol *symbol = rb_entry(node, struct symbol, rb_node);
 
 		addr_array[i] = symbol->addr;
-		name_array[i] = symbol->name; /* the array takes ownership of name */
+		name_array[i] = p;
+
+		p = stpcpy(p, symbol->name);
+		*p++ = '\0';
+		free(symbol->name);
+
 		i++;
 	}
 	assert(i == n_symbols);
+	assert(p - all_names == total_name_len);
 
-	/* the tree is not needed anymore */
-	delete_names_from_tree(addr2fun.rb_node);
+	/* the tree is not needed anymore, names have also been freed */
 	delete_slabs();
 	addr2fun = RB_ROOT;
 
 	return 0;
-}
-
-void delete_arrays(void)
-{
-	unsigned i;
-
-	for (i = 0; i< n_symbols; i++)
-		free(name_array[i]);
-	free(name_array);
-	name_array = NULL;
-
-	free(addr_array);
-	addr_array = NULL;
+oom:
+	delete_arrays();
+	return -ENOMEM;
 }
 
 const char *sym_translator_lookup(unsigned long ip)
 {
 	unsigned low, high, middle;
-	if (!addr_array || !name_array || n_symbols == 0)
+	if (!addr_array || !name_array || !all_names || n_symbols == 0)
 		return NULL;
 
 	low = 0;
