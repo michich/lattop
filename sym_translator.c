@@ -161,7 +161,14 @@ static int parse_kallsyms(void)
 	}
 
 	while ((read = getline(&line, &len, f)) != -1) {
-		sscanf(line, "%lx %c %ms", &addr, &type, &name);
+		char nnn[1024];
+		size_t namelen;
+		sscanf(line, "%lx %c %1023s", &addr, &type, nnn);
+		namelen = strlen(nnn);
+		name = malloc(namelen + 1);
+		memcpy(name, nnn, namelen + 1);
+
+//		sscanf(line, "%lx %c %ms", &addr, &type, &name);
 
 		/* only interested in code */
 		if (type != 't' && type != 'T') {
