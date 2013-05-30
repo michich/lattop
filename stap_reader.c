@@ -88,13 +88,13 @@ static int stap_reader_start(struct polled_reader *pr)
 		argv[n++] = "lat.stp";
 		asprintf(&argv[n++], "%llu", arg_min_delay);
 		asprintf(&argv[n++], "%llu", arg_max_interruptible_delay);
-		asprintf(&argv[n++], "%llu", arg_pid_filter);
+		asprintf(&argv[n++], "%d", arg_pid_filter);
 		argv[n++] = NULL;
 
 		execvp("stap", argv);
 
 		/* only on failure */
-		perror("Executing stap");
+		perror("Failed to execute 'stap'");
 		exit(1);
 	}
 

@@ -33,7 +33,7 @@ enum sort_by arg_sort = SORT_BY_MAX_LATENCY;
 bool arg_reverse;
 unsigned long long arg_min_delay;
 unsigned long long arg_max_interruptible_delay = 5*NSEC_PER_MSEC;
-unsigned long long arg_pid_filter;
+pid_t arg_pid_filter;
 
 static struct polled_reader *readers[MAX_READERS];
 static struct pollfd poll_fds[MAX_READERS];
@@ -259,7 +259,7 @@ static void parse_argv(int argc, char *argv[])
 			break;
 		case 'p':
 			errno = 0;
-			arg_pid_filter = strtoull(optarg, &endptr, 10);
+			arg_pid_filter = strtoul(optarg, &endptr, 10);
 			if (errno || endptr == optarg || *endptr != '\0') {
 				fprintf(stderr, "Invalid PID specification '%s'\n", optarg);
 				exit(1);
