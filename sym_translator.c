@@ -18,6 +18,16 @@ struct symbol {
 	char *name;
 };
 
+struct symbol_slab {
+	struct symbol_slab *next;
+	unsigned long fill_count;
+	struct symbol symbols[];
+};
+#define SLAB_SIZE (128*1024)
+#define SYMBOLS_PER_SLAB ((SLAB_SIZE - sizeof(struct symbol_slab)) / sizeof(struct symbol))
+
+static struct symbol_slab *first_slab, *current_slab;
+
 /* tree of symbols, only used during kallsyms parsing */
 static struct rb_root addr2fun = RB_ROOT;
 /* after parsing, two simple arrays suffice */
@@ -54,7 +64,9 @@ static struct symbol *insert_symbol(unsigned long addr, struct symbol *s)
 	if ((ret = __insert_symbol(addr, s))) {
 		/* we already know this address. some alias? */
 		free(s->name);
-		free(s);
+		/* we're always inserting the last allocated symbol,
+		 * so freeing it from slab is trivial: */
+		current_slab->fill_count--;
 		goto out;
 	}
 	rb_insert_color(&s->rb_node, &addr2fun);
@@ -63,20 +75,66 @@ out:
 	return ret;
 }
 
-static void delete_tree(struct rb_node *n)
+static void delete_names_from_tree(struct rb_node *n)
 {
 	struct symbol *s;
-	if (!n)
-		return;
-	delete_tree(n->rb_left);
-	delete_tree(n->rb_right);
-	s = rb_entry(n, struct symbol, rb_node);
 
 	/* only delete names here if the array hasn't taken ownership of them yet */
-	if (!name_array)
-		free(s->name);
+	if (!n || name_array)
+		return;
+	delete_names_from_tree(n->rb_left);
+	delete_names_from_tree(n->rb_right);
+	s = rb_entry(n, struct symbol, rb_node);
 
-	free(s);
+	free(s->name);
+}
+
+static void delete_slabs(void)
+{
+	struct symbol_slab *ss, *next;
+
+	for (ss = first_slab; ss; ss = next) {
+		next = ss->next;
+		free(ss);
+	}
+
+	current_slab = first_slab = NULL;
+}
+
+static struct symbol_slab *new_slab(void)
+{
+	struct symbol_slab *ss;
+
+	ss = malloc(SLAB_SIZE);
+	if (!ss)
+		return NULL;
+	ss->fill_count = 0;
+	ss->next = NULL;
+	return ss;
+}
+
+static struct symbol *new_symbol(unsigned long addr, char *name)
+{
+	struct symbol_slab *ss;
+	struct symbol *s;
+
+	if (!first_slab || current_slab->fill_count == SYMBOLS_PER_SLAB) {
+		ss = new_slab();
+		if (!ss)
+			return NULL;
+
+		if (!first_slab)
+			current_slab = first_slab = ss;
+		else {
+			current_slab->next = ss;
+			current_slab = ss;
+		}
+	}
+
+	s = &current_slab->symbols[current_slab->fill_count++];
+	s->addr = addr;
+	s->name = name;
+	return s;
 }
 
 static int parse_kallsyms(void)
@@ -106,16 +164,15 @@ static int parse_kallsyms(void)
 			continue;
 		}
 
-		s = malloc(sizeof(struct symbol));
+		s = new_symbol(addr, name);
 		if (!s) {
-			perror("Allocating memory for symbol");
-			delete_tree(addr2fun.rb_node);
+			perror("Allocating memory for symbols");
+			delete_names_from_tree(addr2fun.rb_node);
+			delete_slabs();
 			addr2fun = RB_ROOT;
 			r = -ENOMEM;
 			goto out;
 		}
-		s->addr = addr;
-		s->name = name;
 		insert_symbol(addr, s);
 	}
 
@@ -152,7 +209,8 @@ static int build_arrays(void)
 	assert(i == n_symbols);
 
 	/* the tree is not needed anymore */
-	delete_tree(addr2fun.rb_node);
+	delete_names_from_tree(addr2fun.rb_node);
+	delete_slabs();
 	addr2fun = RB_ROOT;
 
 	return 0;
@@ -222,6 +280,7 @@ int sym_translator_init(void)
 
 void sym_translator_fini(void)
 {
-	delete_tree(addr2fun.rb_node);
+	delete_names_from_tree(addr2fun.rb_node);
+	delete_slabs();
 	delete_arrays();
 }
