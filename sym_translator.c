@@ -161,14 +161,21 @@ static int parse_kallsyms(void)
 	}
 
 	while ((read = getline(&line, &len, f)) != -1) {
-		char nnn[1024];
-		size_t namelen;
-		sscanf(line, "%lx %c %1023s", &addr, &type, nnn);
-		namelen = strlen(nnn);
-		name = malloc(namelen + 1);
-		memcpy(name, nnn, namelen + 1);
+		/*
+		 * %ms in glibc's scanf is implemented as malloc(100) + read +
+		 * realloc.  My names are short, so the final realloc frees
+		 * small chunks that are placed into fastbins. This is a
+		 * pessimization here as it causes much fragmentation. Let's
+		 * avoid it.
+		 * Perhaps realloc should be fixed to avoid creating fastbins?
+		 * After all, there's no reason to expect that the application
+		 * will later ask for blocks of the matching sizes.
+		 */
+		/*sscanf(line, "%lx %c %ms", &addr, &type, &name);*/
 
-//		sscanf(line, "%lx %c %ms", &addr, &type, &name);
+		char nnn[1024];
+		sscanf(line, "%lx %c %1023s", &addr, &type, nnn);
+		name = strdup(nnn);
 
 		/* only interested in code */
 		if (type != 't' && type != 'T') {
