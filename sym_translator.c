@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -260,6 +261,9 @@ static int build_arrays(void)
 	assert(i == n_symbols);
 	assert(p - all_names == total_name_len);
 
+	/* We've just freed a whole bunch of names.
+	 * Let's return the memory to the kernel. */
+	malloc_trim(128*1024);
 	/* the tree is not needed anymore, names have also been freed */
 	delete_slabs();
 	addr2fun = RB_ROOT;
