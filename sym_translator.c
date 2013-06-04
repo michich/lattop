@@ -18,7 +18,7 @@
 struct symbol {
 	struct rb_node rb_node;
 	unsigned long addr;
-	char *name;
+	ptrdiff_t name_offset;  /* relative to all_names */
 };
 
 struct symbol_slab {
@@ -29,6 +29,8 @@ struct symbol_slab {
 #define SLAB_SIZE (1024*1024)
 #define SYMBOLS_PER_SLAB ((SLAB_SIZE - sizeof(struct symbol_slab)) / sizeof(struct symbol))
 
+#define NAMES_INCREMENT (128*1024)
+
 static struct symbol_slab *first_slab, *current_slab;
 
 /* tree of symbols, only used during kallsyms parsing */
@@ -37,8 +39,8 @@ static struct rb_root addr2fun = RB_ROOT;
 static unsigned long *addr_array;  /* sorted for binary search */
 static char **name_array; /* pointers into all_names */
 static char *all_names;   /* storage for all names: "name\0second_name\0third_name\0..." */
+static size_t all_names_alloc, all_names_end;
 static unsigned n_symbols;
-static size_t total_name_len;
 
 static struct symbol *__insert_symbol(unsigned long addr, struct symbol *s)
 {
@@ -68,7 +70,7 @@ static struct symbol *insert_symbol(unsigned long addr, struct symbol *s)
 	struct symbol *ret;
 	if ((ret = __insert_symbol(addr, s))) {
 		/* we already know this address. some alias? */
-		free(s->name);
+
 		/* we're always inserting the last allocated symbol,
 		 * so freeing it from slab is trivial: */
 		current_slab->fill_count--;
@@ -76,23 +78,8 @@ static struct symbol *insert_symbol(unsigned long addr, struct symbol *s)
 	}
 	rb_insert_color(&s->rb_node, &addr2fun);
 	n_symbols++;
-	total_name_len += strlen(s->name) + 1;
 out:
 	return ret;
-}
-
-static void delete_names_from_tree(struct rb_node *n)
-{
-	struct symbol *s;
-
-	/* only delete names here if the array hasn't taken ownership of them yet */
-	if (!n || all_names)
-		return;
-	delete_names_from_tree(n->rb_left);
-	delete_names_from_tree(n->rb_right);
-	s = rb_entry(n, struct symbol, rb_node);
-
-	free(s->name);
 }
 
 static void delete_slabs(void)
@@ -119,7 +106,7 @@ static struct symbol_slab *new_slab(void)
 	return ss;
 }
 
-static struct symbol *new_symbol(unsigned long addr, char *name)
+static struct symbol *new_symbol(unsigned long addr, ptrdiff_t name_offset)
 {
 	struct symbol_slab *ss;
 	struct symbol *s;
@@ -139,7 +126,7 @@ static struct symbol *new_symbol(unsigned long addr, char *name)
 
 	s = &current_slab->symbols[current_slab->fill_count++];
 	s->addr = addr;
-	s->name = name;
+	s->name_offset = name_offset;
 	return s;
 }
 
@@ -157,55 +144,80 @@ static int parse_kallsyms(void)
 
 	f = fopen("/proc/kallsyms", "re");
 	if (!f) {
+		r = -errno;
 		perror("/proc/kallsyms");
-		return -errno;
+		goto err;
+	}
+
+	all_names_alloc = NAMES_INCREMENT;
+	all_names = mmap(NULL, all_names_alloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (all_names == MAP_FAILED) {
+		perror("Allocating memory for symbol names");
+		all_names = NULL;
+		r = -ENOMEM;
+		goto err;
 	}
 
 	while ((read = getline(&line, &len, f)) != -1) {
-		/*
-		 * %ms in glibc's scanf is implemented as malloc(100) + read +
-		 * realloc.  My names are short, so the final realloc frees
-		 * small chunks that are placed into fastbins. This is a
-		 * pessimization here as it causes much fragmentation. Let's
-		 * avoid it.
-		 * Perhaps realloc should be fixed to avoid creating fastbins?
-		 * After all, there's no reason to expect that the application
-		 * will later ask for blocks of the matching sizes.
-		 */
-		/*sscanf(line, "%lx %c %ms", &addr, &type, &name);*/
+		if (all_names_alloc - all_names_end < 1024) {
+			char *new_names;
+			new_names = mremap(all_names, all_names_alloc, all_names_alloc + NAMES_INCREMENT, MREMAP_MAYMOVE);
+			if (new_names == MAP_FAILED) {
+				perror("Allocating memory for symbol names");
+				r = -ENOMEM;
+				goto err;
+			}
+			all_names = new_names;
+			all_names_alloc += NAMES_INCREMENT;
+		}
 
-		char nnn[1024];
-		sscanf(line, "%lx %c %1023s", &addr, &type, nnn);
-		name = strdup(nnn);
+		name = all_names + all_names_end;
+		sscanf(line, "%lx %c %1023s", &addr, &type, name);
 
 		/* only interested in code */
-		if (type != 't' && type != 'T') {
-			free(name);
+		if (type != 't' && type != 'T')
 			continue;
-		}
 
-		s = new_symbol(addr, name);
+		s = new_symbol(addr, name - all_names);
 		if (!s) {
 			perror("Allocating memory for symbols");
-			delete_names_from_tree(addr2fun.rb_node);
-			delete_slabs();
-			addr2fun = RB_ROOT;
 			r = -ENOMEM;
-			goto out;
+			goto err;
 		}
-		insert_symbol(addr, s);
+
+		if (!insert_symbol(addr, s))
+			all_names_end += strlen(name) + 1;
 	}
 
-out:
+	/* trim all_names to minimal required size */
+	all_names = mremap(all_names, all_names_alloc, all_names_end, 0);
+	assert(all_names != MAP_FAILED);
+	all_names_alloc = all_names_end;
+
 	free(line);
 	fclose(f);
+	return 0;
+
+err:
+	delete_slabs();
+	addr2fun = RB_ROOT;
+
+	if (all_names) {
+		munmap(all_names, all_names_alloc);
+		all_names = NULL;
+	}
+
+	free(line);
+
+	if (f)
+		fclose(f);
 	return r;
 }
 
 static void delete_arrays(void)
 {
 	if (all_names) {
-		munmap(all_names, total_name_len);
+		munmap(all_names, all_names_alloc);
 		all_names = NULL;
 	}
 
@@ -223,7 +235,6 @@ static void delete_arrays(void)
 static int build_arrays(void)
 {
 	struct rb_node *node;
-	char *p;
 	unsigned i;
 
 	addr_array = mmap(NULL, n_symbols * sizeof(unsigned long), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
@@ -238,33 +249,18 @@ static int build_arrays(void)
 		goto oom;
 	}
 
-	all_names = mmap(NULL, total_name_len, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-	if (all_names == MAP_FAILED) {
-		all_names = NULL;
-		goto oom;
-	}
-
 	i = 0;
-	p = all_names;
 	for (node = rb_first(&addr2fun); node; node = rb_next(node)) {
 		struct symbol *symbol = rb_entry(node, struct symbol, rb_node);
 
 		addr_array[i] = symbol->addr;
-		name_array[i] = p;
-
-		p = stpcpy(p, symbol->name);
-		*p++ = '\0';
-		free(symbol->name);
+		name_array[i] = all_names + symbol->name_offset;
 
 		i++;
 	}
 	assert(i == n_symbols);
-	assert(p - all_names == total_name_len);
 
-	/* We've just freed a whole bunch of names.
-	 * Let's return the memory to the kernel. */
-	malloc_trim(128*1024);
-	/* the tree is not needed anymore, names have also been freed */
+	/* the tree is not needed anymore */
 	delete_slabs();
 	addr2fun = RB_ROOT;
 
@@ -325,7 +321,6 @@ int sym_translator_init(void)
 
 void sym_translator_fini(void)
 {
-	delete_names_from_tree(addr2fun.rb_node);
 	delete_slabs();
 	delete_arrays();
 }
