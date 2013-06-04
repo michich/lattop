@@ -138,8 +138,9 @@ static int parse_kallsyms(void)
 	ssize_t read;
 	unsigned long addr;
 	char type;
-	char *name;
 	struct symbol *s;
+	char *new_names;
+	char *name;
 	int r = 0;
 
 	f = fopen("/proc/kallsyms", "re");
@@ -149,18 +150,17 @@ static int parse_kallsyms(void)
 		goto err;
 	}
 
-	all_names_alloc = NAMES_INCREMENT;
-	all_names = mmap(NULL, all_names_alloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-	if (all_names == MAP_FAILED) {
+	new_names = mmap(NULL, NAMES_INCREMENT, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (new_names == MAP_FAILED) {
 		perror("Allocating memory for symbol names");
-		all_names = NULL;
 		r = -ENOMEM;
 		goto err;
 	}
+	all_names = new_names;
+	all_names_alloc = NAMES_INCREMENT;
 
 	while ((read = getline(&line, &len, f)) != -1) {
 		if (all_names_alloc - all_names_end < 1024) {
-			char *new_names;
 			new_names = mremap(all_names, all_names_alloc, all_names_alloc + NAMES_INCREMENT, MREMAP_MAYMOVE);
 			if (new_names == MAP_FAILED) {
 				perror("Allocating memory for symbol names");
