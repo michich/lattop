@@ -194,6 +194,8 @@ static int parse_kallsyms(void)
 	assert(all_names != MAP_FAILED);
 	all_names_alloc = all_names_end;
 
+	mprotect(all_names, all_names_alloc, PROT_READ);
+
 	free(line);
 	fclose(f);
 	return 0;
@@ -263,6 +265,9 @@ static int build_arrays(void)
 	/* the tree is not needed anymore */
 	delete_slabs();
 	addr2fun = RB_ROOT;
+
+	mprotect(addr_array, n_symbols * sizeof(unsigned long), PROT_READ);
+	mprotect(name_array, n_symbols * sizeof(char*), PROT_READ);
 
 	return 0;
 oom:
