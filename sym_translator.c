@@ -172,7 +172,11 @@ static int parse_kallsyms(void)
 		}
 
 		name = all_names + all_names_end;
-		sscanf(line, "%lx %c %1023s", &addr, &type, name);
+
+		if (sscanf(line, "%lx %c %1023s", &addr, &type, name) != 3) {
+			fprintf(stderr, "Failed to parse line: %s", line);
+			continue;
+		}
 
 		/* only interested in code */
 		if (type != 't' && type != 'T')
@@ -188,6 +192,9 @@ static int parse_kallsyms(void)
 		if (!insert_symbol(addr, s))
 			all_names_end += strlen(name) + 1;
 	}
+
+	if (all_names_end == 0)
+		goto err;
 
 	/* trim all_names to minimal required size */
 	all_names = mremap(all_names, all_names_alloc, all_names_end, 0);
