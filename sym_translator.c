@@ -204,12 +204,12 @@ static int parse_kallsyms(void)
 			const char *translation;
 			int prio;
 			/* prefer symbol names that have a translation defined */
-			if (lat_translator_lookup(all_names + s->name_offset, &translation, &prio) == 0 &&
+			if (lat_translator_lookup(name, &translation, &prio) == 0 &&
 			    lat_translator_lookup(all_names + old->name_offset, &translation, &prio) < 0) {
 				/* Replace the old symbol name with the better one.
 				 * Note that the old name is leaked inside all_names, but
 				 * this is sufficiently rare that it hardly matters. */
-				old->name_offset = s->name_offset;
+				old->name_offset = name - all_names;
 				all_names_end += strlen(name) + 1;
 			}
 
