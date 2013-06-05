@@ -76,7 +76,6 @@ static struct symbol *insert_symbol(unsigned long addr, struct symbol *s)
 		return ret;
 
 	rb_insert_color(&s->rb_node, &addr2fun);
-	n_symbols++;
 	return NULL;
 }
 
@@ -194,9 +193,10 @@ static int parse_kallsyms(void)
 			goto err;
 		}
 
-		if (!insert_symbol(addr, s))
+		if (!insert_symbol(addr, s)) {
 			all_names_end += strlen(name) + 1;
-		else
+			n_symbols++;
+		} else
 			undo_new_symbol(s);
 	}
 
@@ -252,7 +252,7 @@ static int build_arrays(void)
 	unsigned i;
 
 	new_alloc = mmap(NULL, n_symbols * (sizeof(unsigned long) + sizeof(char*)),
-	                        PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	                 PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 	if (new_alloc == MAP_FAILED)
 		goto oom;
 	addr_name_arrays = new_alloc;
