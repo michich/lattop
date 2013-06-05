@@ -232,18 +232,10 @@ static int parse_kallsyms(void)
 	return 0;
 
 err:
-	delete_slabs();
-	addr2fun = RB_ROOT;
-
-	if (all_names) {
-		munmap(all_names, all_names_alloc);
-		all_names = NULL;
-	}
-
 	free(line);
-
 	if (f)
 		fclose(f);
+
 	return r;
 }
 
@@ -271,7 +263,7 @@ static int build_arrays(void)
 	new_alloc = mmap(NULL, n_symbols * (sizeof(unsigned long) + sizeof(char*)),
 	                 PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 	if (new_alloc == MAP_FAILED)
-		goto oom;
+		return -ENOMEM;
 	addr_name_arrays = new_alloc;
 
 	addr_array = (unsigned long*) addr_name_arrays;
@@ -292,12 +284,8 @@ static int build_arrays(void)
 
 	/* the tree is not needed anymore */
 	delete_slabs();
-	addr2fun = RB_ROOT;
 
 	return 0;
-oom:
-	delete_arrays();
-	return -ENOMEM;
 }
 
 const char *sym_translator_lookup(unsigned long ip)
@@ -334,9 +322,16 @@ int sym_translator_init(void)
 
 	r = parse_kallsyms();
 	if (r)
-		return r;
+		goto err;
 
-	return build_arrays();
+	r = build_arrays();
+	if (r)
+		goto err;
+
+	return 0;
+err:
+	sym_translator_fini();
+	return r;
 }
 
 void sym_translator_fini(void)
