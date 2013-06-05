@@ -36,6 +36,7 @@ static struct symbol_slab *first_slab, *current_slab;
 /* tree of symbols, only used during kallsyms parsing */
 static struct rb_root addr2fun = RB_ROOT;
 
+static char *addr_name_arrays;  /* storage for both addr_array and name_array */
 static unsigned long *addr_array;  /* sorted for binary search */
 static char **name_array; /* pointers into all_names */
 static char *all_names;   /* storage for all names: "name\0second_name\0third_name\0..." */
@@ -230,33 +231,28 @@ static void delete_arrays(void)
 		all_names = NULL;
 	}
 
-	if (name_array) {
-		munmap(name_array, n_symbols * sizeof(char*));
-		name_array = NULL;
-	}
-
-	if (addr_array) {
-		munmap(addr_array, n_symbols * sizeof(unsigned long));
+	if (addr_name_arrays) {
+		munmap(addr_name_arrays, n_symbols * (sizeof(unsigned long) + sizeof(char*)));
 		addr_array = NULL;
+		name_array = NULL;
+		addr_name_arrays = NULL;
 	}
 }
 
 static int build_arrays(void)
 {
+	void *new_alloc;
 	struct rb_node *node;
 	unsigned i;
 
-	addr_array = mmap(NULL, n_symbols * sizeof(unsigned long), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-	if (addr_array == MAP_FAILED) {
-		addr_array = NULL;
+	new_alloc = mmap(NULL, n_symbols * (sizeof(unsigned long) + sizeof(char*)),
+	                        PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	if (new_alloc == MAP_FAILED)
 		goto oom;
-	}
+	addr_name_arrays = new_alloc;
 
-	name_array = mmap(NULL, n_symbols * sizeof(char*), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-	if (name_array == MAP_FAILED) {
-		name_array = NULL;
-		goto oom;
-	}
+	addr_array = (unsigned long*) addr_name_arrays;
+	name_array = (char**)(addr_name_arrays + n_symbols * sizeof(unsigned long));
 
 	i = 0;
 	for (node = rb_first(&addr2fun); node; node = rb_next(node)) {
@@ -269,12 +265,11 @@ static int build_arrays(void)
 	}
 	assert(i == n_symbols);
 
+	mprotect(addr_name_arrays, n_symbols * (sizeof(unsigned long) + sizeof(char*)), PROT_READ);
+
 	/* the tree is not needed anymore */
 	delete_slabs();
 	addr2fun = RB_ROOT;
-
-	mprotect(addr_array, n_symbols * sizeof(unsigned long), PROT_READ);
-	mprotect(name_array, n_symbols * sizeof(char*), PROT_READ);
 
 	return 0;
 oom:
