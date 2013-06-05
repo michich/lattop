@@ -72,9 +72,6 @@ static struct symbol *insert_symbol(unsigned long addr, struct symbol *s)
 	if ((ret = __insert_symbol(addr, s))) {
 		/* we already know this address. some alias? */
 
-		/* we're always inserting the last allocated symbol,
-		 * so freeing it from slab is trivial: */
-		current_slab->fill_count--;
 		goto out;
 	}
 	rb_insert_color(&s->rb_node, &addr2fun);
@@ -129,6 +126,13 @@ static struct symbol *new_symbol(unsigned long addr, ptrdiff_t name_offset)
 	s->addr = addr;
 	s->name_offset = name_offset;
 	return s;
+}
+
+static void undo_new_symbol(struct symbol *s)
+{
+	assert(current_slab->fill_count > 0);
+	current_slab->fill_count--;
+	assert(&current_slab->symbols[current_slab->fill_count] == s);
 }
 
 static int parse_kallsyms(void)
@@ -192,6 +196,8 @@ static int parse_kallsyms(void)
 
 		if (!insert_symbol(addr, s))
 			all_names_end += strlen(name) + 1;
+		else
+			undo_new_symbol(s);
 	}
 
 	if (all_names_end == 0)
