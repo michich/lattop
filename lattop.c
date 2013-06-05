@@ -115,8 +115,8 @@ static void fini(void)
 		free(readers[i]);
 	}
 	pa_fini();
-	lat_translator_fini();
 	sym_translator_fini();
+	lat_translator_fini();
 }
 
 static int init(void)
@@ -124,15 +124,15 @@ static int init(void)
 	int r, i;
 	struct sched_param schedp;
 
+	r = lat_translator_init();
+	if (r)
+		fprintf(stderr, "Warning: Failed to load latencytop translations.\n");
+
 	r = sym_translator_init();
 	if (r) {
 		fprintf(stderr, "Failed to init the symbol map.\n");
 		goto err;
 	}
-
-	r = lat_translator_init();
-	if (r)
-		fprintf(stderr, "Warning: Failed to load latencytop translations.\n");
 
 	pa_init();
 

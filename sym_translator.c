@@ -12,8 +12,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "rbtree.h"
+
 #include "sym_translator.h"
+
+#include "rbtree.h"
+#include "lat_translator.h"
 
 struct symbol {
 	struct rb_node rb_node;
@@ -142,7 +145,7 @@ static int parse_kallsyms(void)
 	ssize_t read;
 	unsigned long addr;
 	char type;
-	struct symbol *s;
+	struct symbol *s, *old;
 	char *new_names;
 	char *name;
 	int r = 0;
@@ -193,11 +196,25 @@ static int parse_kallsyms(void)
 			goto err;
 		}
 
-		if (!insert_symbol(addr, s)) {
+		old = insert_symbol(addr, s);
+		if (!old) {
 			all_names_end += strlen(name) + 1;
 			n_symbols++;
-		} else
+		} else {
+			const char *translation;
+			int prio;
+			/* prefer symbol names that have a translation defined */
+			if (lat_translator_lookup(all_names + s->name_offset, &translation, &prio) == 0 &&
+			    lat_translator_lookup(all_names + old->name_offset, &translation, &prio) < 0) {
+				/* Replace the old symbol name with the better one.
+				 * Note that the old name is leaked inside all_names, but
+				 * this is sufficiently rare that it hardly matters. */
+				old->name_offset = s->name_offset;
+				all_names_end += strlen(name) + 1;
+			}
+
 			undo_new_symbol(s);
+		}
 	}
 
 	if (all_names_end == 0)
