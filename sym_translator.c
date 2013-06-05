@@ -69,15 +69,15 @@ static struct symbol *__insert_symbol(unsigned long addr, struct symbol *s)
 static struct symbol *insert_symbol(unsigned long addr, struct symbol *s)
 {
 	struct symbol *ret;
-	if ((ret = __insert_symbol(addr, s))) {
-		/* we already know this address. some alias? */
 
-		goto out;
-	}
+	ret = __insert_symbol(addr, s);
+	if (ret)
+		/* we already know this address. some alias? */
+		return ret;
+
 	rb_insert_color(&s->rb_node, &addr2fun);
 	n_symbols++;
-out:
-	return ret;
+	return NULL;
 }
 
 static void delete_slabs(void)
